@@ -30,6 +30,8 @@ export default function App() {
   const [steps, setSteps] = useState<AgentStep[]>([])
   const [liveModel, setLiveModel] = useState<string | undefined>()
   const [origin, setOrigin] = useState<OrderOrigin | undefined>()
+  const [autoAccept, setAutoAccept] = useState(false)
+  const [autoRun, setAutoRun] = useState(false)
 
   const reset = useCallback(() => {
     setPhase('idle')
@@ -38,14 +40,15 @@ export default function App() {
     setSteps([])
     setLiveModel(undefined)
     setOrigin(undefined)
+    setAutoRun(false)
   }, [])
 
   const setStatus = useCallback((id: string, status: ReviewStatus) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, status } : it)))
   }, [])
 
-  // 启动一次对标运行(可来自手动指令,或某渠道工单)
-  const startRun = useCallback((text: string, orderOrigin?: OrderOrigin) => {
+  // 启动一次对标运行(可来自手动指令,或某渠道工单);auto=AI 自动受理模式
+  const startRun = useCallback((text: string, orderOrigin?: OrderOrigin, auto = false) => {
     const cmd = parseCommand(text, 'idle')
     const only = cmd.kind === 'run' ? cmd.only : undefined
     let built = buildReviewItems()
@@ -53,6 +56,7 @@ export default function App() {
 
     setInstruction(text)
     setOrigin(orderOrigin)
+    setAutoRun(auto)
     setItems(built)
     setSteps(
       buildAgentSteps(
@@ -83,15 +87,22 @@ export default function App() {
   // 从某渠道工单受理:读取聊天记录里提取的指令并启动
   const pickWorkOrder = useCallback(
     (o: WorkOrder) => {
-      startRun(o.instruction, {
-        channelName: o.channelName,
-        channelEmoji: o.channelEmoji,
-        sender: o.sender,
-        attachment: o.attachment,
-      })
+      startRun(
+        o.instruction,
+        { channelName: o.channelName, channelEmoji: o.channelEmoji, sender: o.sender, attachment: o.attachment },
+        autoAccept,
+      )
     },
-    [startRun],
+    [startRun, autoAccept],
   )
+
+  // AI 执行流结束:进入审核;自动受理模式下,高置信项直接通过,只留异常给人工
+  const handleRunComplete = useCallback(() => {
+    if (autoRun) {
+      setItems((prev) => prev.map((it) => (it.needsReview ? it : { ...it, status: 'approved' })))
+    }
+    setPhase('review')
+  }, [autoRun])
 
   // 审核阶段的自然语言指令
   const handleReviewCommand = useCallback(
@@ -187,7 +198,11 @@ export default function App() {
                 <span className="h-px flex-1 bg-line" />
               </div>
               <div className="mt-4 text-left">
-                <InboxPanel onPickup={pickWorkOrder} />
+                <InboxPanel
+                  onPickup={pickWorkOrder}
+                  autoAccept={autoAccept}
+                  onToggleAuto={() => setAutoAccept((v) => !v)}
+                />
               </div>
             </motion.div>
           )}
@@ -204,7 +219,7 @@ export default function App() {
             >
               <Instruction text={instruction} origin={origin} />
               <div className="mt-3">
-                <AgentFeed steps={steps} onComplete={() => setPhase('review')} />
+                <AgentFeed steps={steps} onComplete={handleRunComplete} />
               </div>
             </motion.div>
           )}
@@ -217,6 +232,7 @@ export default function App() {
                 <ReviewTable
                   items={items}
                   liveModel={liveModel}
+                  autoRun={autoRun}
                   onApprove={(id) => setStatus(id, 'approved')}
                   onReject={(id) => setStatus(id, 'rejected')}
                   onUndo={(id) => setStatus(id, 'pending')}

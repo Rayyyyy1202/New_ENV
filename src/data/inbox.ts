@@ -90,3 +90,22 @@ export const workOrders: WorkOrder[] = [
     instruction: '给这份装箱单在亚马逊德国找对标链接,品牌商品排除掉',
   },
 ]
+
+// 用于"实时飘入"演示的新消息工单(初始不在收件箱里,延迟飘入)。
+export const incomingOrder: WorkOrder = {
+  id: 'w0',
+  channelId: 'wechat',
+  channelName: '微信',
+  channelEmoji: '💬',
+  sender: '张总',
+  senderRole: '客户',
+  time: '刚刚',
+  chat: [
+    { from: 'them', text: '急!这批样品明天要装柜' },
+    { from: 'them', text: '先把德国亚马逊的对标链接整出来,品牌的别要' },
+  ],
+  attachment: '样品清单_0603.png',
+  instruction: '给这份装箱单在亚马逊德国找对标链接,品牌商品排除掉',
+  unread: true,
+}
+

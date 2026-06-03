@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { CheckCheck, ArrowRight } from 'lucide-react'
+import { CheckCheck, ArrowRight, Zap } from 'lucide-react'
 import type { ReviewItem } from '../engine/review'
 import ReviewRow from './ReviewRow'
 import { listStagger, fadeUp } from '../ui/motion'
@@ -7,6 +7,7 @@ import { listStagger, fadeUp } from '../ui/motion'
 interface Props {
   items: ReviewItem[]
   liveModel?: string
+  autoRun?: boolean
   onApprove: (id: string) => void
   onReject: (id: string) => void
   onUndo: (id: string) => void
@@ -14,7 +15,7 @@ interface Props {
   onFinish: () => void
 }
 
-export default function ReviewTable({ items, liveModel, onApprove, onReject, onUndo, onApproveAll, onFinish }: Props) {
+export default function ReviewTable({ items, liveModel, autoRun, onApprove, onReject, onUndo, onApproveAll, onFinish }: Props) {
   const pending = items.filter((i) => i.status === 'pending').length
   const approved = items.filter((i) => i.status === 'approved').length
   const rejected = items.filter((i) => i.status === 'rejected').length
@@ -22,6 +23,14 @@ export default function ReviewTable({ items, liveModel, onApprove, onReject, onU
 
   return (
     <div className="space-y-3">
+      {autoRun && (
+        <div className="flex items-center gap-2 rounded-xl border border-accent/30 bg-accentSoft px-4 py-2.5 text-[13px] text-accent">
+          <Zap size={15} className="shrink-0" />
+          <span>
+            自动受理模式 · AI 已直接通过 <b className="tnum">{approved}</b> 项高置信对标,仅 <b className="tnum">{pending}</b> 项异常需你确认
+          </span>
+        </div>
+      )}
       {/* 审核概览条 */}
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-line bg-surface p-3.5 shadow-card">
         <div>

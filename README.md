@@ -33,6 +33,17 @@ npm run preview    # 本地预览构建产物
 npx tsx scripts/selftest.ts   # 数据层 + 引擎自检(对照验收标准)
 ```
 
+### 生成客户对比 PDF
+
+`docs` 之外另有一份可直接发客户的对比一页纸(普通版 vs AI 版),内容取自 `src/data/comparison.ts`:
+
+```bash
+npm i -D puppeteer    # 仅生成 PDF 时需要(会下载 Chromium;故不放进默认依赖)
+npm run pdf           # 生成 LinkFinder-为什么选AI版.pdf
+```
+
+> Puppeteer 刻意不写进 `package.json` 默认依赖,避免拖慢 / 影响 Vercel 构建。
+
 ## 三、真实模型接入(可选)
 
 第一站翻译可调用真实 OpenAI,key 只存服务端、绝不进前端:

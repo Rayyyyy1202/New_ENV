@@ -7,7 +7,9 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "selftest": "npx tsx scripts/selftest.ts",
+    "pdf": "npx tsx scripts/make-pdf.ts"
   },
   "dependencies": {
     "framer-motion": "^11.3.0",

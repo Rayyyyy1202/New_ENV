@@ -1,11 +1,19 @@
 import { motion } from 'framer-motion'
-import { CheckCircle2, RotateCcw, Gauge, Clock, ShieldCheck } from 'lucide-react'
+import { CheckCircle2, RotateCcw, Gauge, Clock, ShieldCheck, Swords } from 'lucide-react'
 import AnimatedNumber from './common/AnimatedNumber'
 import type { ReviewItem } from '../engine/review'
 import { roi } from '../data/roi'
 import { fadeUp } from '../ui/motion'
 
-export default function ResultSummary({ items, onReset }: { items: ReviewItem[]; onReset: () => void }) {
+export default function ResultSummary({
+  items,
+  onReset,
+  onCompare,
+}: {
+  items: ReviewItem[]
+  onReset: () => void
+  onCompare: () => void
+}) {
   const approved = items.filter((i) => i.status === 'approved').length
   const rejected = items.filter((i) => i.status === 'rejected').length
   const avgConf = Math.round(items.reduce((s, i) => s + i.confidence, 0) / Math.max(items.length, 1))
@@ -46,12 +54,18 @@ export default function ResultSummary({ items, onReset }: { items: ReviewItem[];
         <span className="text-muted">核验漏检 <b className="tnum text-ok">0</b></span>
       </div>
 
-      <div className="flex justify-center pt-1">
+      <div className="flex flex-wrap justify-center gap-2 pt-1">
         <button
           onClick={onReset}
           className="flex items-center gap-2 rounded-xl border border-line bg-surface px-5 py-2.5 text-sm font-medium text-ink shadow-card transition-colors hover:bg-canvas"
         >
           <RotateCcw size={15} /> 再演示一次
+        </button>
+        <button
+          onClick={onCompare}
+          className="flex items-center gap-2 rounded-xl bg-accent px-5 py-2.5 text-sm font-semibold text-white shadow-card transition-opacity hover:opacity-90"
+        >
+          <Swords size={15} /> 为什么比普通版强
         </button>
       </div>
     </motion.div>

@@ -1,11 +1,12 @@
 import { useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Sparkles, FileSpreadsheet } from 'lucide-react'
+import { Sparkles, FileSpreadsheet, ArrowRight } from 'lucide-react'
 import Header from './components/Header'
 import CommandBar from './components/CommandBar'
 import AgentFeed from './components/AgentFeed'
 import ReviewTable from './components/ReviewTable'
 import ResultSummary from './components/ResultSummary'
+import ComparisonView from './components/ComparisonView'
 import InboxPanel from './components/InboxPanel'
 import type { OrderOrigin, WorkOrder } from './data/inbox'
 import {
@@ -21,7 +22,7 @@ import {
 import { liveTranslate } from './lib/translate'
 import { EASE, fadeUp } from './ui/motion'
 
-type Phase = 'idle' | 'running' | 'review' | 'done'
+type Phase = 'idle' | 'running' | 'review' | 'done' | 'compare'
 
 export default function App() {
   const [phase, setPhase] = useState<Phase>('idle')
@@ -139,7 +140,12 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-canvas">
-      <Header onReset={reset} showReset={phase !== 'idle'} />
+      <Header
+        onReset={reset}
+        showReset={phase !== 'idle'}
+        onCompare={() => setPhase('compare')}
+        showCompare={phase !== 'compare'}
+      />
 
       <main className="mx-auto max-w-5xl px-5 pb-40 pt-8">
         <AnimatePresence mode="wait">
@@ -204,6 +210,13 @@ export default function App() {
                   onToggleAuto={() => setAutoAccept((v) => !v)}
                 />
               </div>
+
+              <button
+                onClick={() => setPhase('compare')}
+                className="mx-auto mt-6 flex items-center gap-1.5 text-[13px] font-medium text-accent hover:underline"
+              >
+                看看我们比几千块的普通版强在哪 <ArrowRight size={14} />
+              </button>
             </motion.div>
           )}
 
@@ -246,7 +259,14 @@ export default function App() {
           {/* ───── 汇总 ───── */}
           {phase === 'done' && (
             <motion.div key="done" className="pt-2">
-              <ResultSummary items={items} onReset={reset} />
+              <ResultSummary items={items} onReset={reset} onCompare={() => setPhase('compare')} />
+            </motion.div>
+          )}
+
+          {/* ───── 对比:为什么选 AI 版 ───── */}
+          {phase === 'compare' && (
+            <motion.div key="compare" className="pt-2">
+              <ComparisonView onBack={reset} onTry={reset} />
             </motion.div>
           )}
         </AnimatePresence>

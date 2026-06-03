@@ -5,6 +5,7 @@ import { strategies, candidatesForStrategy, bestCandidate, showerHeadCandidates 
 import { roi, qualityReport, exceptions, compareData } from '../src/data/roi'
 import { buildReviewItems, parseCommand, matchItemId } from '../src/engine/review'
 import { channels, workOrders } from '../src/data/inbox'
+import { steps as compareSteps, scores as compareScores, ordinaryPath, aiPath } from '../src/data/comparison'
 import type { AmazonCandidate } from '../src/data/types'
 
 let pass = 0
@@ -74,6 +75,12 @@ check('已接入渠道含飞书/企业微信/微信/邮箱', ['feishu', 'wecom',
 check('工单 >= 2 条', workOrders.length >= 2)
 check('每条工单都有聊天记录与提取指令', workOrders.every((o) => o.chat.length >= 1 && o.instruction))
 check('工单指令可被解析为有效运行', workOrders.every((o) => parseCommand(o.instruction, 'idle').kind === 'run'))
+
+console.log('\n【对比 · 为什么选 AI 版】')
+check('逐环节对比 >= 6 条', compareSteps.length >= 6)
+check('每条含 普通版/AI版/好在哪', compareSteps.every((s) => s.ordinary && s.ai && s.win))
+check('两条实现路径均非空', ordinaryPath.length > 0 && aiPath.length > 0)
+check('能力评分 AI 全面高于普通版', compareScores.every((s) => s.ai > s.ordinary))
 
 console.log('\n【投资回报 / 质检报告 / 异常归类】')
 check('ROI 商品数=12', roi.itemCount === 12)

@@ -55,7 +55,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       signal: ctrl.signal,
       body: JSON.stringify({
         model,
-        temperature: 0.3,
+        // GPT-5 / o 系列推理模型只接受默认 temperature，自定义值会 400；
+        // 仅对 gpt-4 系列传 temperature。
+        ...(model.startsWith('gpt-4') ? { temperature: 0.3 } : {}),
         response_format: { type: 'json_object' },
         messages: [
           { role: 'system', content: SYSTEM_PROMPT },

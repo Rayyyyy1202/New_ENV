@@ -20,6 +20,7 @@ import {
   type ReviewStatus,
 } from './engine/review'
 import { liveTranslate } from './lib/translate'
+import { chat, type ChatAction, type ChatTurn } from './lib/chat'
 import { EASE, fadeUp } from './ui/motion'
 
 type Phase = 'idle' | 'running' | 'review' | 'done' | 'compare'
@@ -33,10 +34,17 @@ export default function App() {
   const [origin, setOrigin] = useState<OrderOrigin | undefined>()
   const [autoAccept, setAutoAccept] = useState(false)
   const [autoRun, setAutoRun] = useState(false)
+  // 对话
+  const [messages, setMessages] = useState<ChatTurn[]>([])
+  const [thinking, setThinking] = useState(false)
+  const [reviewReply, setReviewReply] = useState('')
+  const [reviewThinking, setReviewThinking] = useState(false)
 
   const reset = useCallback(() => {
     setPhase('idle')
     setInstruction('')
+    setMessages([])
+    setReviewReply('')
     setItems([])
     setSteps([])
     setLiveModel(undefined)
@@ -105,38 +113,68 @@ export default function App() {
     setPhase('review')
   }, [autoRun])
 
-  // 审核阶段的自然语言指令
-  const handleReviewCommand = useCallback(
-    (text: string) => {
-      const cmd = parseCommand(text, 'review')
-      switch (cmd.kind) {
-        case 'reset':
-          reset()
+  const approveAll = useCallback(
+    () => setItems((prev) => prev.map((it) => (it.status === 'pending' ? { ...it, status: 'approved' } : it))),
+    [],
+  )
+
+  // 执行对话里解析出的动作
+  const executeAction = useCallback(
+    (a: ChatAction) => {
+      switch (a.type) {
+        case 'run':
+          startRun(a.instruction || '给这份装箱单在亚马逊德国找对标链接')
           break
-        case 'approveAll':
-          setItems((prev) => prev.map((it) => (it.status === 'pending' ? { ...it, status: 'approved' } : it)))
+        case 'approve_all':
+          approveAll()
           break
-        case 'rejectAll':
+        case 'reject_all':
           setItems((prev) => prev.map((it) => (it.status === 'pending' ? { ...it, status: 'rejected' } : it)))
           break
-        case 'approve':
-          setStatus(cmd.match, 'approved')
-          break
-        case 'reject':
-          setStatus(cmd.match, 'rejected')
-          break
-        default: {
-          // 兜底:若提到了某商品,默认通过它
-          const id = matchItemId(text)
+        case 'approve': {
+          const id = matchItemId(a.target || '')
           if (id) setStatus(id, 'approved')
+          break
+        }
+        case 'reject': {
+          const id = matchItemId(a.target || '')
+          if (id) setStatus(id, 'rejected')
+          break
         }
       }
     },
-    [reset, setStatus],
+    [startRun, approveAll, setStatus],
   )
 
-  const approveAll = () =>
-    setItems((prev) => prev.map((it) => (it.status === 'pending' ? { ...it, status: 'approved' } : it)))
+  // 首页对话:先听懂是提问还是命令,提问就回答、命令才执行
+  const handleIdleSubmit = useCallback(
+    async (text: string) => {
+      const history = messages
+      setMessages((prev) => [...prev, { role: 'user', text }])
+      setThinking(true)
+      const res = await chat(text, 'idle', history)
+      setThinking(false)
+      setMessages((prev) => [...prev, { role: 'assistant', text: res.reply }])
+      executeAction(res.action)
+    },
+    [messages, executeAction],
+  )
+
+  // 审核阶段对话
+  const handleReviewSubmit = useCallback(
+    async (text: string) => {
+      if (/(重新开始|重来|reset|清空)/.test(text)) {
+        reset()
+        return
+      }
+      setReviewThinking(true)
+      const res = await chat(text, 'review', [])
+      setReviewThinking(false)
+      setReviewReply(res.reply)
+      executeAction(res.action)
+    },
+    [executeAction, reset],
+  )
 
   return (
     <div className="min-h-screen bg-canvas">
@@ -169,12 +207,22 @@ export default function App() {
                 输入指令,AI 自动完成翻译、查库、亚马逊德国搜索与商标/材质/原产地核验,把对标链接<b className="text-ink">填好表</b>交给你审核。
               </p>
 
-              <div className="mt-7 text-left">
+              {/* 对话记录 */}
+              {(messages.length > 0 || thinking) && (
+                <div className="mb-3 mt-6 space-y-2 text-left">
+                  {messages.map((m, i) => (
+                    <ChatBubble key={i} role={m.role} text={m.text} />
+                  ))}
+                  {thinking && <ChatBubble role="assistant" text="" typing />}
+                </div>
+              )}
+
+              <div className={`text-left ${messages.length > 0 || thinking ? '' : 'mt-7'}`}>
                 <CommandBar
                   variant="hero"
-                  placeholder="例如:给这份装箱单在亚马逊德国找对标链接,品牌商品排除掉…"
-                  hint="回车发送 · 这是演示,数据为内置示例装箱单"
-                  onSubmit={startRun}
+                  placeholder="问我能做什么,或直接说「开始」「品牌的排除掉」…"
+                  hint="支持自然语言对话 · 回车发送 · 内置示例装箱单"
+                  onSubmit={handleIdleSubmit}
                 />
               </div>
 
@@ -272,18 +320,48 @@ export default function App() {
         </AnimatePresence>
       </main>
 
-      {/* 审核阶段:底部常驻自然语言指令栏 */}
+      {/* 审核阶段:底部常驻自然语言对话栏 */}
       {phase === 'review' && (
         <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-canvas/90 px-5 py-3 backdrop-blur">
           <div className="mx-auto max-w-5xl">
+            {(reviewReply || reviewThinking) && (
+              <div className="mb-2 flex items-start gap-2 text-[13px]">
+                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-accent text-[10px] font-semibold text-white">
+                  AI
+                </span>
+                <span className="text-muted">{reviewThinking ? '思考中…' : reviewReply}</span>
+              </div>
+            )}
             <CommandBar
               variant="docked"
-              placeholder='用自然语言审核,例如:"全部通过"、"驳回莲蓬头"、"通过瑜伽垫"…'
-              onSubmit={handleReviewCommand}
+              placeholder='对话或下命令,例如:"全部通过"、"驳回莲蓬头"、"莲蓬头为什么选它?"…'
+              onSubmit={handleReviewSubmit}
             />
           </div>
         </div>
       )}
+    </div>
+  )
+}
+
+function ChatBubble({ role, text, typing }: { role: 'user' | 'assistant'; text: string; typing?: boolean }) {
+  const isUser = role === 'user'
+  return (
+    <div className={`flex items-start gap-2 ${isUser ? 'flex-row-reverse' : ''}`}>
+      <span
+        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-semibold ${
+          isUser ? 'bg-ink text-white' : 'bg-accent text-white'
+        }`}
+      >
+        {isUser ? '你' : 'AI'}
+      </span>
+      <div
+        className={`max-w-[80%] rounded-2xl px-3.5 py-2 text-[14px] leading-relaxed shadow-card ${
+          isUser ? 'bg-ink text-white' : 'border border-line bg-surface text-ink'
+        }`}
+      >
+        {typing ? <span className="text-faint">思考中…</span> : text}
+      </div>
     </div>
   )
 }

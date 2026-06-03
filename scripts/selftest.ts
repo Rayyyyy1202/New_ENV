@@ -6,6 +6,7 @@ import { roi, qualityReport, exceptions, compareData } from '../src/data/roi'
 import { buildReviewItems, parseCommand, matchItemId } from '../src/engine/review'
 import { channels, workOrders } from '../src/data/inbox'
 import { steps as compareSteps, scores as compareScores, ordinaryPath, aiPath } from '../src/data/comparison'
+import { localReply } from '../src/lib/chat'
 import type { AmazonCandidate } from '../src/data/types'
 
 let pass = 0
@@ -69,6 +70,14 @@ check('"驳回莲蓬头" → reject p09', JSON.stringify(parseCommand('驳回莲
 check('"通过瑜伽垫" → approve p03', JSON.stringify(parseCommand('通过瑜伽垫', 'review')) === JSON.stringify({ kind: 'approve', match: 'p03' }))
 check('"只处理莲蓬头" → run only p09', JSON.stringify(parseCommand('只处理莲蓬头', 'idle')) === JSON.stringify({ kind: 'run', only: 'p09' }))
 check('关键词匹配 shower → p09', matchItemId('帮我看看 shower head') === 'p09')
+
+console.log('\n【自然语言对话(本地兜底)】')
+check('提问"你可以自动填表吗" → 不擅自开跑(none)', localReply('你可以自动填表吗', 'idle').action.type === 'none')
+check('提问"支持对话吗" → 回答而非运行', localReply('支持自然语言对话吗?', 'idle').action.type === 'none')
+check('"开始" → 运行', localReply('开始', 'idle').action.type === 'run')
+check('提问都带有回复文案', localReply('你能做什么', 'idle').reply.length > 5)
+check('审核期"全部通过" → approve_all', localReply('全部通过', 'review').action.type === 'approve_all')
+check('审核期"驳回莲蓬头" → reject', localReply('驳回莲蓬头', 'review').action.type === 'reject')
 
 console.log('\n【渠道接入 / 工单收件箱】')
 check('已接入渠道含飞书/企业微信/微信/邮箱', ['feishu', 'wecom', 'wechat', 'email'].every((id) => channels.some((c) => c.id === id && c.connected)))

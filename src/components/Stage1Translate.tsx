@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import { motion } from 'framer-motion'
-import { Languages, FileWarning, Check } from 'lucide-react'
+import { Languages, FileWarning, Check, Zap, Loader2, AlertCircle } from 'lucide-react'
 import { packingList } from '../data/packingList'
 import AIBadge from './common/AIBadge'
 import PulseDot from './common/PulseDot'
 import { EASE } from '../theme/design'
+import { liveTranslate, type LiveTranslation } from '../lib/translate'
 
 interface Props {
   autoplay: boolean
@@ -18,11 +19,44 @@ const STEPS = [
   '正在调用 AI 电商语境翻译…',
 ]
 
+type LiveState = 'idle' | 'loading' | 'done' | 'error' | 'unconfigured'
+
 export default function Stage1Translate({ onStatus }: Props) {
   const [revealed, setRevealed] = useState(0)
   const [done, setDone] = useState(false)
   const total = packingList.length
   const started = useRef(false)
+
+  // 真实 OpenAI 翻译（经后端代理，可选）
+  const [liveMap, setLiveMap] = useState<Record<string, LiveTranslation>>({})
+  const [liveState, setLiveState] = useState<LiveState>('idle')
+  const [liveModel, setLiveModel] = useState<string>('')
+
+  async function runLiveTranslate() {
+    setLiveState('loading')
+    onStatus('正在调用真实 OpenAI 模型（经服务端代理）翻译中…')
+    const res = await liveTranslate(
+      packingList.map((p) => ({ id: p.id, raw: p.rawName, kind: p.rawKind })),
+    )
+    if (res.notConfigured) {
+      setLiveState('unconfigured')
+      onStatus('后端未配置 OPENAI_API_KEY · 已回退到脚本演示数据')
+      return
+    }
+    if (!res.ok || !res.results.length) {
+      setLiveState('error')
+      onStatus('真实模型调用失败 · 已回退到脚本演示数据')
+      return
+    }
+    const map: Record<string, LiveTranslation> = {}
+    res.results.forEach((r) => {
+      if (r?.id) map[r.id] = r
+    })
+    setLiveMap(map)
+    setLiveModel(res.model ?? '')
+    setLiveState('done')
+    onStatus(`真实模型翻译完成 · ${res.model} · 共 ${res.results.length} 项`)
+  }
 
   useEffect(() => {
     if (started.current) return
@@ -58,10 +92,37 @@ export default function Stage1Translate({ onStatus }: Props) {
 
   return (
     <div className="mx-auto max-w-6xl px-6 py-4">
-      <StageHeader
-        title="第一站 · 智能转换"
-        desc="自动识别装箱单类型，用 AI 把中文品名翻成亚马逊买家真实会搜的电商词，并归一到标准模板"
-      />
+      <div className="flex flex-wrap items-end justify-between gap-3">
+        <StageHeader
+          title="第一站 · 智能转换"
+          desc="自动识别装箱单类型，用 AI 把中文品名翻成亚马逊买家真实会搜的电商词，并归一到标准模板"
+        />
+        <div className="mb-4 flex items-center gap-2">
+          {liveState === 'unconfigured' && (
+            <span className="flex items-center gap-1 text-[10px] text-warn">
+              <AlertCircle size={12} /> 后端未配置 OPENAI_API_KEY · 用的是脚本数据
+            </span>
+          )}
+          {liveState === 'error' && (
+            <span className="flex items-center gap-1 text-[10px] text-bad">
+              <AlertCircle size={12} /> 调用失败 · 已回退脚本数据
+            </span>
+          )}
+          {liveState === 'done' && (
+            <span className="flex items-center gap-1 rounded-full border border-bad/50 bg-bad/10 px-2 py-0.5 text-[10px] font-bold text-bad">
+              <span className="h-1.5 w-1.5 animate-pulseDot rounded-full bg-bad" /> LIVE · {liveModel}
+            </span>
+          )}
+          <button
+            onClick={runLiveTranslate}
+            disabled={liveState === 'loading'}
+            className="flex items-center gap-1.5 rounded-lg border border-bad/50 bg-bad/10 px-3 py-1.5 text-xs font-semibold text-bad transition-all hover:bg-bad/20 disabled:opacity-60"
+          >
+            {liveState === 'loading' ? <Loader2 size={14} className="animate-spin" /> : <Zap size={14} />}
+            {liveState === 'done' ? '用真实 AI 重新翻译' : '用真实 OpenAI 翻译'}
+          </button>
+        </div>
+      </div>
 
       <div className="grid gap-4 lg:grid-cols-2">
         {/* 左：原始杂乱装箱单 */}
@@ -109,7 +170,11 @@ export default function Stage1Translate({ onStatus }: Props) {
           </div>
 
           <div className="max-h-[440px] space-y-2 overflow-y-auto pr-1">
-            {packingList.slice(0, revealed).map((p) => (
+            {packingList.slice(0, revealed).map((p) => {
+              const live = liveMap[p.id]
+              const enName = live?.enName ?? p.enName
+              const buyerTerms = live?.buyerTerms?.length ? live.buyerTerms : p.buyerTerms
+              return (
               <motion.div
                 key={p.id}
                 initial={{ opacity: 0, x: 14, boxShadow: '0 0 0 1px rgba(34,211,238,0.6)' }}
@@ -120,15 +185,21 @@ export default function Stage1Translate({ onStatus }: Props) {
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
                     <span>{p.emoji}</span>
-                    <span className="truncate text-sm font-medium text-ink">{p.enName}</span>
+                    <span className="truncate text-sm font-medium text-ink">{enName}</span>
                   </div>
-                  <AIBadge label="电商翻译" />
+                  {live ? (
+                    <span className="flex shrink-0 items-center gap-1 rounded-full border border-bad/50 bg-bad/10 px-2 py-0.5 text-[10px] font-bold text-bad">
+                      <Zap size={10} /> LIVE
+                    </span>
+                  ) : (
+                    <AIBadge label="电商翻译" />
+                  )}
                 </div>
 
                 {/* 买家搜索词变体 */}
                 <div className="mt-1 truncate text-[11px] text-ink-faint">
                   买家搜索词：
-                  <span className="tnum text-ink-dim">{p.buyerTerms.join(' · ')}</span>
+                  <span className="tnum text-ink-dim">{buyerTerms.join(' · ')}</span>
                 </div>
 
                 {/* 标准字段点亮 */}
@@ -155,7 +226,8 @@ export default function Stage1Translate({ onStatus }: Props) {
                   )}
                 </div>
               </motion.div>
-            ))}
+              )
+            })}
           </div>
         </div>
       </div>

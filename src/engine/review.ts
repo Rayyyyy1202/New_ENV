@@ -109,12 +109,28 @@ export interface AgentStep {
   ms: number // 该步停留时长
 }
 
-export function buildAgentSteps(instruction: string, liveModel?: string): AgentStep[] {
+export interface StepOrigin {
+  channelName: string
+  sender: string
+  attachment?: string
+}
+
+export function buildAgentSteps(instruction: string, liveModel?: string, origin?: StepOrigin): AgentStep[] {
   const translateLine = liveModel
     ? `调用真实模型 ${liveModel} 翻译为亚马逊买家会搜的电商关键词`
     : '把中文品名翻译为亚马逊买家会搜的电商关键词'
+  const lead: AgentStep[] = origin
+    ? [
+        {
+          text: `从【${origin.channelName}】读取 ${origin.sender} 的聊天记录`,
+          detail: origin.attachment ? `解析附件 ${origin.attachment} · 提取工单指令` : '理解上下文 · 提取工单指令',
+          ms: 1000,
+        },
+        { text: '已提取工单指令', detail: instruction, ms: 700 },
+      ]
+    : [{ text: `收到指令`, detail: instruction, ms: 700 }]
   return [
-    { text: `收到指令`, detail: instruction, ms: 700 },
+    ...lead,
     { text: '识别装箱单 · 12 个商品', detail: '中英混排,含纯中文与"仅材质"行', ms: 900 },
     { text: translateLine, detail: 'AI 电商语境翻译 + 海关编码智能推荐', ms: 1100 },
     { text: '语义向量检索历史对标库', detail: '中文/英文/翻译名映射到同一语义空间', ms: 1000 },

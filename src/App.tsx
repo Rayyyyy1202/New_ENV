@@ -6,6 +6,8 @@ import CommandBar from './components/CommandBar'
 import AgentFeed from './components/AgentFeed'
 import ReviewTable from './components/ReviewTable'
 import ResultSummary from './components/ResultSummary'
+import InboxPanel from './components/InboxPanel'
+import type { OrderOrigin, WorkOrder } from './data/inbox'
 import {
   buildReviewItems,
   buildAgentSteps,
@@ -27,6 +29,7 @@ export default function App() {
   const [items, setItems] = useState<ReviewItem[]>([])
   const [steps, setSteps] = useState<AgentStep[]>([])
   const [liveModel, setLiveModel] = useState<string | undefined>()
+  const [origin, setOrigin] = useState<OrderOrigin | undefined>()
 
   const reset = useCallback(() => {
     setPhase('idle')
@@ -34,22 +37,32 @@ export default function App() {
     setItems([])
     setSteps([])
     setLiveModel(undefined)
+    setOrigin(undefined)
   }, [])
 
   const setStatus = useCallback((id: string, status: ReviewStatus) => {
     setItems((prev) => prev.map((it) => (it.id === id ? { ...it, status } : it)))
   }, [])
 
-  // 启动一次对标运行
-  const startRun = useCallback((text: string) => {
+  // 启动一次对标运行(可来自手动指令,或某渠道工单)
+  const startRun = useCallback((text: string, orderOrigin?: OrderOrigin) => {
     const cmd = parseCommand(text, 'idle')
     const only = cmd.kind === 'run' ? cmd.only : undefined
     let built = buildReviewItems()
     if (only) built = built.filter((i) => i.id === only)
 
     setInstruction(text)
+    setOrigin(orderOrigin)
     setItems(built)
-    setSteps(buildAgentSteps(text))
+    setSteps(
+      buildAgentSteps(
+        text,
+        undefined,
+        orderOrigin
+          ? { channelName: orderOrigin.channelName, sender: orderOrigin.sender, attachment: orderOrigin.attachment }
+          : undefined,
+      ),
+    )
     setLiveModel(undefined)
     setPhase('running')
 
@@ -66,6 +79,19 @@ export default function App() {
       setLiveModel(res.model)
     })
   }, [])
+
+  // 从某渠道工单受理:读取聊天记录里提取的指令并启动
+  const pickWorkOrder = useCallback(
+    (o: WorkOrder) => {
+      startRun(o.instruction, {
+        channelName: o.channelName,
+        channelEmoji: o.channelEmoji,
+        sender: o.sender,
+        attachment: o.attachment,
+      })
+    },
+    [startRun],
+  )
 
   // 审核阶段的自然语言指令
   const handleReviewCommand = useCallback(
@@ -149,10 +175,20 @@ export default function App() {
 
               <button
                 onClick={() => startRun('给这份装箱单在亚马逊德国找对标链接')}
-                className="mx-auto mt-6 flex items-center gap-2 text-[13px] font-medium text-accent hover:underline"
+                className="mx-auto mt-5 flex items-center gap-2 text-[13px] font-medium text-accent hover:underline"
               >
                 <FileSpreadsheet size={15} /> 或直接加载示例装箱单(12 个商品)
               </button>
+
+              {/* 渠道接入 + 工单收件箱 */}
+              <div className="mt-8 flex items-center gap-3 text-[12px] text-faint">
+                <span className="h-px flex-1 bg-line" />
+                或 · 让 AI 从已接入的渠道自动受理工单
+                <span className="h-px flex-1 bg-line" />
+              </div>
+              <div className="mt-4 text-left">
+                <InboxPanel onPickup={pickWorkOrder} />
+              </div>
             </motion.div>
           )}
 
@@ -166,7 +202,7 @@ export default function App() {
               exit={{ opacity: 0 }}
               className="mx-auto max-w-2xl pt-4"
             >
-              <Instruction text={instruction} />
+              <Instruction text={instruction} origin={origin} />
               <div className="mt-3">
                 <AgentFeed steps={steps} onComplete={() => setPhase('review')} />
               </div>
@@ -176,7 +212,7 @@ export default function App() {
           {/* ───── 审核 ───── */}
           {phase === 'review' && (
             <motion.div key="review" variants={fadeUp} initial="hidden" animate="show" exit={{ opacity: 0 }}>
-              <Instruction text={instruction} />
+              <Instruction text={instruction} origin={origin} />
               <div className="mt-3">
                 <ReviewTable
                   items={items}
@@ -216,13 +252,21 @@ export default function App() {
   )
 }
 
-function Instruction({ text }: { text: string }) {
+function Instruction({ text, origin }: { text: string; origin?: OrderOrigin }) {
   return (
     <div className="flex items-start gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
-      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink text-[11px] font-semibold text-white">
-        你
+      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink text-[12px] text-white">
+        {origin ? origin.channelEmoji : <span className="text-[11px] font-semibold">你</span>}
       </div>
-      <p className="text-[14px] text-ink">{text}</p>
+      <div className="min-w-0">
+        {origin && (
+          <div className="mb-0.5 text-[11px] text-faint">
+            来自【{origin.channelName}】· {origin.sender}
+            {origin.attachment && <span> · 附件 {origin.attachment}</span>}
+          </div>
+        )}
+        <p className="text-[14px] text-ink">{text}</p>
+      </div>
     </div>
   )
 }

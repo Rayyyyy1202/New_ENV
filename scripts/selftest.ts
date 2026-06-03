@@ -4,6 +4,7 @@ import { packingList, HERO_ITEM_ID } from '../src/data/packingList'
 import { strategies, candidatesForStrategy, bestCandidate, showerHeadCandidates } from '../src/data/amazonCandidates'
 import { roi, qualityReport, exceptions, compareData } from '../src/data/roi'
 import { buildReviewItems, parseCommand, matchItemId } from '../src/engine/review'
+import { channels, workOrders } from '../src/data/inbox'
 import type { AmazonCandidate } from '../src/data/types'
 
 let pass = 0
@@ -67,6 +68,12 @@ check('"驳回莲蓬头" → reject p09', JSON.stringify(parseCommand('驳回莲
 check('"通过瑜伽垫" → approve p03', JSON.stringify(parseCommand('通过瑜伽垫', 'review')) === JSON.stringify({ kind: 'approve', match: 'p03' }))
 check('"只处理莲蓬头" → run only p09', JSON.stringify(parseCommand('只处理莲蓬头', 'idle')) === JSON.stringify({ kind: 'run', only: 'p09' }))
 check('关键词匹配 shower → p09', matchItemId('帮我看看 shower head') === 'p09')
+
+console.log('\n【渠道接入 / 工单收件箱】')
+check('已接入渠道含飞书/企业微信/微信/邮箱', ['feishu', 'wecom', 'wechat', 'email'].every((id) => channels.some((c) => c.id === id && c.connected)))
+check('工单 >= 2 条', workOrders.length >= 2)
+check('每条工单都有聊天记录与提取指令', workOrders.every((o) => o.chat.length >= 1 && o.instruction))
+check('工单指令可被解析为有效运行', workOrders.every((o) => parseCommand(o.instruction, 'idle').kind === 'run'))
 
 console.log('\n【投资回报 / 质检报告 / 异常归类】')
 check('ROI 商品数=12', roi.itemCount === 12)

@@ -3,7 +3,7 @@
 import { packingList, HERO_ITEM_ID } from '../src/data/packingList'
 import { strategies, candidatesForStrategy, bestCandidate, showerHeadCandidates } from '../src/data/amazonCandidates'
 import { roi, qualityReport, exceptions, compareData } from '../src/data/roi'
-import { narration } from '../src/data/narration'
+import { buildReviewItems, parseCommand, matchItemId } from '../src/engine/review'
 import type { AmazonCandidate } from '../src/data/types'
 
 let pass = 0
@@ -51,10 +51,22 @@ strategies.forEach((s) => {
   check(`策略「${s.label}」候选 4-6 张`, n >= 4 && n <= 6, `实际 ${n}`)
 })
 
-console.log('\n【旁白脚本】')
-const stages = ['upload', 'translate', 'database', 'amazon', 'lock', 'roi'] as const
-check('六站旁白齐全', stages.every((s) => narration[s] && narration[s].length > 10))
-check('第三站旁白点出 AI 价值', /AI|多模态|商标/.test(narration.amazon))
+console.log('\n【审核引擎 · AI 自动填表】')
+const review = buildReviewItems()
+check('审核队列 12 行', review.length === 12)
+check('每行均由 AI 填好对标(标题+链接+置信度)', review.every((r) => r.title && r.link && r.confidence > 0))
+check('每行均带 AI 理由', review.every((r) => !!r.reasoning))
+check('莲蓬头来自亚马逊新对标且含三重核验', review.some((r) => r.source === 'amazon' && r.checks))
+check('恰有 2 行低置信度需重点复核', review.filter((r) => r.needsReview).length === 2)
+check('被推荐行附带已排除候选清单', review.some((r) => (r.rejectedCandidates?.length ?? 0) > 0))
+check('初始状态均为待审核', review.every((r) => r.status === 'pending'))
+
+console.log('\n【自然语言指令解析】')
+check('"全部通过" → approveAll', parseCommand('全部通过', 'review').kind === 'approveAll')
+check('"驳回莲蓬头" → reject p09', JSON.stringify(parseCommand('驳回莲蓬头', 'review')) === JSON.stringify({ kind: 'reject', match: 'p09' }))
+check('"通过瑜伽垫" → approve p03', JSON.stringify(parseCommand('通过瑜伽垫', 'review')) === JSON.stringify({ kind: 'approve', match: 'p03' }))
+check('"只处理莲蓬头" → run only p09', JSON.stringify(parseCommand('只处理莲蓬头', 'idle')) === JSON.stringify({ kind: 'run', only: 'p09' }))
+check('关键词匹配 shower → p09', matchItemId('帮我看看 shower head') === 'p09')
 
 console.log('\n【投资回报 / 质检报告 / 异常归类】')
 check('ROI 商品数=12', roi.itemCount === 12)

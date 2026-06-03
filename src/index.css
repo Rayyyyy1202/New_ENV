@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 :root {
-  color-scheme: dark;
+  color-scheme: light;
 }
 
 html,
@@ -14,55 +14,35 @@ body,
 
 body {
   margin: 0;
-  background-color: #070b18;
-  color: #e8ecf8;
+  background-color: #f6f7f9;
+  color: #16181d;
   font-family: 'Inter', system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
-  overflow-x: hidden;
 }
 
-/* 指挥中心背景网格 — 极淡，缓慢流动 */
-.cmd-grid {
-  background-image:
-    linear-gradient(rgba(34, 211, 238, 0.05) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(34, 211, 238, 0.05) 1px, transparent 1px);
-  background-size: 60px 60px;
-}
-
-/* 滚动条 */
-::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-::-webkit-scrollbar-track {
-  background: #0e1530;
-}
-::-webkit-scrollbar-thumb {
-  background: #1e2a52;
-  border-radius: 4px;
-}
-::-webkit-scrollbar-thumb:hover {
-  background: #22d3ee55;
-}
-
-/* 流动电流连接线 */
-.flow-line {
-  background-image: linear-gradient(
-    90deg,
-    transparent 0%,
-    #22d3ee 25%,
-    #67e8f9 50%,
-    #22d3ee 75%,
-    transparent 100%
-  );
-  background-size: 200% 100%;
-}
-
-/* 等宽数据字 */
 .tnum {
   font-family: 'JetBrains Mono', ui-monospace, monospace;
   font-variant-numeric: tabular-nums;
+}
+
+/* AI 占位骨架的微光 */
+.shimmer {
+  background: linear-gradient(90deg, #eef0f4 25%, #f7f8fa 37%, #eef0f4 63%);
+  background-size: 200% 100%;
+}
+
+::-webkit-scrollbar {
+  width: 10px;
+  height: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #d8dbe2;
+  border-radius: 6px;
+  border: 3px solid #f6f7f9;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #c2c6d0;
 }
 
 @media (prefers-reduced-motion: reduce) {

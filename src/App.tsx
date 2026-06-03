@@ -1,105 +1,228 @@
-import { useCallback, useEffect, useState } from 'react'
+import { useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { EASE } from './theme/design'
-import PipelineNav from './components/PipelineNav'
-import RobotStatusBar from './components/RobotStatusBar'
-import SubtitleBar from './components/common/SubtitleBar'
-import TopControls from './components/TopControls'
-import UploadScreen from './components/UploadScreen'
-import Stage1Translate from './components/Stage1Translate'
-import Stage2Database from './components/Stage2Database'
-import Stage3Amazon from './components/Stage3Amazon'
-import Stage4Lock from './components/Stage4Lock'
-import Stage5ROI from './components/Stage5ROI'
-import { useAutoPlay } from './hooks/useAutoPlay'
-import { playChime } from './hooks/useChime'
+import { Sparkles, FileSpreadsheet } from 'lucide-react'
+import Header from './components/Header'
+import CommandBar from './components/CommandBar'
+import AgentFeed from './components/AgentFeed'
+import ReviewTable from './components/ReviewTable'
+import ResultSummary from './components/ResultSummary'
+import {
+  buildReviewItems,
+  buildAgentSteps,
+  parseCommand,
+  matchItemId,
+  EXAMPLE_COMMANDS,
+  type ReviewItem,
+  type AgentStep,
+  type ReviewStatus,
+} from './engine/review'
+import { liveTranslate } from './lib/translate'
+import { EASE, fadeUp } from './ui/motion'
 
-export type StageId = 'upload' | 'translate' | 'database' | 'amazon' | 'lock' | 'roi'
-
-export const STAGE_ORDER: StageId[] = ['upload', 'translate', 'database', 'amazon', 'lock', 'roi']
+type Phase = 'idle' | 'running' | 'review' | 'done'
 
 export default function App() {
-  const [stage, setStage] = useState<StageId>('upload')
-  const [autoplay, setAutoplay] = useState(false)
-  const [sound, setSound] = useState(false)
-  const [robotMsg, setRobotMsg] = useState('待命中 · 等待装箱单')
+  const [phase, setPhase] = useState<Phase>('idle')
+  const [instruction, setInstruction] = useState('')
+  const [items, setItems] = useState<ReviewItem[]>([])
+  const [steps, setSteps] = useState<AgentStep[]>([])
+  const [liveModel, setLiveModel] = useState<string | undefined>()
 
-  const goTo = useCallback(
-    (next: StageId) => {
-      setStage(next)
-      if (sound) playChime()
-    },
-    [sound],
-  )
-
-  const advance = useCallback(() => {
-    setStage((cur) => {
-      const idx = STAGE_ORDER.indexOf(cur)
-      const next = STAGE_ORDER[Math.min(idx + 1, STAGE_ORDER.length - 1)]
-      if (next !== cur && sound) playChime()
-      return next
-    })
-  }, [sound])
-
-  // 自动演示：到达 roi 后停止
-  useAutoPlay(stage, autoplay && stage !== 'roi', advance)
-
-  // 重新演示
-  const restart = useCallback(() => {
-    setStage('upload')
-    setRobotMsg('待命中 · 等待装箱单')
+  const reset = useCallback(() => {
+    setPhase('idle')
+    setInstruction('')
+    setItems([])
+    setSteps([])
+    setLiveModel(undefined)
   }, [])
 
-  useEffect(() => {
-    if (stage === 'upload') setRobotMsg('待命中 · 等待装箱单')
-  }, [stage])
+  const setStatus = useCallback((id: string, status: ReviewStatus) => {
+    setItems((prev) => prev.map((it) => (it.id === id ? { ...it, status } : it)))
+  }, [])
 
-  const showPipeline = stage !== 'upload'
+  // 启动一次对标运行
+  const startRun = useCallback((text: string) => {
+    const cmd = parseCommand(text, 'idle')
+    const only = cmd.kind === 'run' ? cmd.only : undefined
+    let built = buildReviewItems()
+    if (only) built = built.filter((i) => i.id === only)
+
+    setInstruction(text)
+    setItems(built)
+    setSteps(buildAgentSteps(text))
+    setLiveModel(undefined)
+    setPhase('running')
+
+    // 异步调用真实模型翻译,完成后回填(失败则保持脚本数据)
+    liveTranslate(built.map((i) => ({ id: i.id, raw: i.rawName, kind: i.rawKind }))).then((res) => {
+      if (!res.ok || !res.results.length) return
+      const map = new Map(res.results.map((r) => [r.id, r]))
+      setItems((prev) =>
+        prev.map((it) => {
+          const r = map.get(it.id)
+          return r ? { ...it, product: r.enName, buyerTerms: r.buyerTerms?.length ? r.buyerTerms : it.buyerTerms } : it
+        }),
+      )
+      setLiveModel(res.model)
+    })
+  }, [])
+
+  // 审核阶段的自然语言指令
+  const handleReviewCommand = useCallback(
+    (text: string) => {
+      const cmd = parseCommand(text, 'review')
+      switch (cmd.kind) {
+        case 'reset':
+          reset()
+          break
+        case 'approveAll':
+          setItems((prev) => prev.map((it) => (it.status === 'pending' ? { ...it, status: 'approved' } : it)))
+          break
+        case 'rejectAll':
+          setItems((prev) => prev.map((it) => (it.status === 'pending' ? { ...it, status: 'rejected' } : it)))
+          break
+        case 'approve':
+          setStatus(cmd.match, 'approved')
+          break
+        case 'reject':
+          setStatus(cmd.match, 'rejected')
+          break
+        default: {
+          // 兜底:若提到了某商品,默认通过它
+          const id = matchItemId(text)
+          if (id) setStatus(id, 'approved')
+        }
+      }
+    },
+    [reset, setStatus],
+  )
+
+  const approveAll = () =>
+    setItems((prev) => prev.map((it) => (it.status === 'pending' ? { ...it, status: 'approved' } : it)))
 
   return (
-    <div className="relative min-h-screen overflow-hidden bg-bg-base text-ink">
-      {/* 背景微动网格 */}
-      <div className="pointer-events-none fixed inset-0 cmd-grid animate-gridMove opacity-60" />
-      <div className="pointer-events-none fixed inset-0 bg-gradient-to-b from-cyan/[0.04] via-transparent to-bg-base" />
-      {/* 角落辉光 */}
-      <div className="pointer-events-none fixed -left-40 -top-40 h-96 w-96 rounded-full bg-cyan/10 blur-3xl" />
-      <div className="pointer-events-none fixed -bottom-40 -right-40 h-96 w-96 rounded-full bg-cyanDeep/10 blur-3xl" />
+    <div className="min-h-screen bg-canvas">
+      <Header onReset={reset} showReset={phase !== 'idle'} />
 
-      <div className="relative z-10 flex min-h-screen flex-col">
-        <TopControls
-          autoplay={autoplay}
-          sound={sound}
-          onToggleAuto={() => setAutoplay((v) => !v)}
-          onToggleSound={() => setSound((v) => !v)}
-          onRestart={restart}
-          showRestart={stage !== 'upload'}
-        />
-
-        {showPipeline && <PipelineNav current={stage} onJump={goTo} />}
-
-        <main className="relative flex-1">
-          <AnimatePresence mode="wait">
+      <main className="mx-auto max-w-5xl px-5 pb-40 pt-8">
+        <AnimatePresence mode="wait">
+          {/* ───── 首页:自然语言指令台 ───── */}
+          {phase === 'idle' && (
             <motion.div
-              key={stage}
-              initial={{ opacity: 0, y: 16 }}
+              key="idle"
+              initial={{ opacity: 0, y: 12 }}
               animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -16 }}
-              transition={{ duration: 0.5, ease: EASE }}
-              className="h-full"
+              exit={{ opacity: 0, y: -12 }}
+              transition={{ duration: 0.4, ease: EASE }}
+              className="mx-auto mt-[8vh] max-w-2xl text-center"
             >
-              {stage === 'upload' && <UploadScreen onStart={() => goTo('translate')} />}
-              {stage === 'translate' && <Stage1Translate autoplay={autoplay} onStatus={setRobotMsg} onDone={advance} />}
-              {stage === 'database' && <Stage2Database autoplay={autoplay} onStatus={setRobotMsg} onDone={advance} />}
-              {stage === 'amazon' && <Stage3Amazon autoplay={autoplay} onStatus={setRobotMsg} onDone={advance} />}
-              {stage === 'lock' && <Stage4Lock autoplay={autoplay} onStatus={setRobotMsg} onDone={advance} />}
-              {stage === 'roi' && <Stage5ROI onRestart={restart} onStatus={setRobotMsg} />}
-            </motion.div>
-          </AnimatePresence>
-        </main>
+              <div className="mb-3 inline-flex items-center gap-1.5 rounded-full bg-accentSoft px-3 py-1 text-[12px] font-medium text-accent">
+                <Sparkles size={13} /> AI 自动对标 · 你只需审核
+              </div>
+              <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
+                用一句话,给装箱单找好亚马逊对标
+              </h1>
+              <p className="mx-auto mt-3 max-w-md text-[15px] text-muted">
+                输入指令,AI 自动完成翻译、查库、亚马逊德国搜索与商标/材质/原产地核验,把对标链接<b className="text-ink">填好表</b>交给你审核。
+              </p>
 
-        {showPipeline && <RobotStatusBar message={robotMsg} />}
-        {autoplay && <SubtitleBar stage={stage} />}
+              <div className="mt-7 text-left">
+                <CommandBar
+                  variant="hero"
+                  placeholder="例如:给这份装箱单在亚马逊德国找对标链接,品牌商品排除掉…"
+                  hint="回车发送 · 这是演示,数据为内置示例装箱单"
+                  onSubmit={startRun}
+                />
+              </div>
+
+              <div className="mt-4 flex flex-wrap justify-center gap-2">
+                {EXAMPLE_COMMANDS.map((c) => (
+                  <button
+                    key={c}
+                    onClick={() => startRun(c)}
+                    className="rounded-full border border-line bg-surface px-3 py-1.5 text-[12px] text-muted shadow-card transition-colors hover:border-accent/40 hover:text-accent"
+                  >
+                    {c}
+                  </button>
+                ))}
+              </div>
+
+              <button
+                onClick={() => startRun('给这份装箱单在亚马逊德国找对标链接')}
+                className="mx-auto mt-6 flex items-center gap-2 text-[13px] font-medium text-accent hover:underline"
+              >
+                <FileSpreadsheet size={15} /> 或直接加载示例装箱单(12 个商品)
+              </button>
+            </motion.div>
+          )}
+
+          {/* ───── 运行中:AI 执行流 ───── */}
+          {phase === 'running' && (
+            <motion.div
+              key="running"
+              variants={fadeUp}
+              initial="hidden"
+              animate="show"
+              exit={{ opacity: 0 }}
+              className="mx-auto max-w-2xl pt-4"
+            >
+              <Instruction text={instruction} />
+              <div className="mt-3">
+                <AgentFeed steps={steps} onComplete={() => setPhase('review')} />
+              </div>
+            </motion.div>
+          )}
+
+          {/* ───── 审核 ───── */}
+          {phase === 'review' && (
+            <motion.div key="review" variants={fadeUp} initial="hidden" animate="show" exit={{ opacity: 0 }}>
+              <Instruction text={instruction} />
+              <div className="mt-3">
+                <ReviewTable
+                  items={items}
+                  liveModel={liveModel}
+                  onApprove={(id) => setStatus(id, 'approved')}
+                  onReject={(id) => setStatus(id, 'rejected')}
+                  onUndo={(id) => setStatus(id, 'pending')}
+                  onApproveAll={approveAll}
+                  onFinish={() => setPhase('done')}
+                />
+              </div>
+            </motion.div>
+          )}
+
+          {/* ───── 汇总 ───── */}
+          {phase === 'done' && (
+            <motion.div key="done" className="pt-2">
+              <ResultSummary items={items} onReset={reset} />
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+
+      {/* 审核阶段:底部常驻自然语言指令栏 */}
+      {phase === 'review' && (
+        <div className="fixed inset-x-0 bottom-0 z-20 border-t border-line bg-canvas/90 px-5 py-3 backdrop-blur">
+          <div className="mx-auto max-w-5xl">
+            <CommandBar
+              variant="docked"
+              placeholder='用自然语言审核,例如:"全部通过"、"驳回莲蓬头"、"通过瑜伽垫"…'
+              onSubmit={handleReviewCommand}
+            />
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+function Instruction({ text }: { text: string }) {
+  return (
+    <div className="flex items-start gap-2 rounded-xl border border-line bg-surface px-4 py-3 shadow-card">
+      <div className="mt-0.5 flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-ink text-[11px] font-semibold text-white">
+        你
       </div>
+      <p className="text-[14px] text-ink">{text}</p>
     </div>
   )
 }

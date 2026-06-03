@@ -1,113 +1,81 @@
-# Amazon LinkFinder · AI 对标链接引擎（销售演示）
+# LinkFinder · AI 对标助手（销售演示）
 
-> 把"装箱单 → AI 翻译 → 查历史库 → 亚马逊德国多策略搜索 → 商标/材质/原产地核验 → 固化对标链接"
-> 这套繁琐的人工流程，做成一条像科幻指挥中心一样会发光的可视化流水线。
-> **九十秒看懂价值。** 全部为内置假数据，本地即可运行，专为投屏销售演示打造。
+> 把"装箱单 → 翻译 → 查历史库 → 亚马逊德国搜索 → 商标/材质/原产地核验 → 固化对标链接"
+> 这套繁琐的人工流程,收敛成一句话:**你下指令,AI 自动填表,你只管审核。**
+> 极简浅色界面,内置假数据,本地即可运行;第一站翻译已接通真实 OpenAI 模型(可选)。
+
+线上演示:**https://amazon-linkfinder-demo.vercel.app**
 
 ---
 
-## 一、技术栈
+## 一、核心交互(本次重构后)
 
-- **Vite + React + TypeScript** —— 应用底座
-- **Tailwind CSS** —— 指挥中心暗色科技风样式
-- **Framer Motion** —— 全程动效（炫酷的关键）
-- **lucide-react** —— 图标
-- **recharts** —— 投资回报对比图表
+不再是点来点去的五个站点,而是一条**对话式**主线:
 
-无后端、无登录、无真实网络请求；上传仅触发动画，数据走 `src/data/` 里的内置假数据。
+1. **下指令** —— 首页一个自然语言输入框。输入"给这份装箱单在亚马逊德国找对标链接",
+   或点示例指令 / "加载示例装箱单"。
+2. **AI 自动执行** —— 屏幕显示 AI 用自然语言播报它在做什么(识别 → 翻译 → 语义查库 →
+   亚马逊多策略搜索 → 三重核验)。
+3. **AI 自动填表,你来审核** —— AI 把 12 行对标结果**填好**:对标标题、链接、欧元价、
+   置信度、以及"为什么这么填"的理由。你逐行 **通过 / 驳回**,或点 **查看依据** 审计 AI 的判断
+   (翻译、语义相似度、三重核验、已排除的候选)。低置信度行自动标 **重点复核**。
+4. **自然语言审核** —— 底部输入框支持"全部通过""驳回莲蓬头""通过瑜伽垫"等口语指令。
+5. **汇总** —— 通过数、耗时对比、效率提升、AI 质检。
 
 ## 二、本地运行
 
 ```bash
-# 1. 安装依赖（需 Node 18+）
 npm install
+npm run dev        # 打开终端给出的地址(默认 http://localhost:5173)
 
-# 2. 启动开发服务器
-npm run dev
-# 浏览器打开终端里给出的地址（默认 http://localhost:5173）
-
-# 可选：生产构建与本地预览
-npm run build
-npm run preview
+npm run build      # 生产构建 + 类型检查
+npm run preview    # 本地预览构建产物
+npx tsx scripts/selftest.ts   # 数据层 + 引擎自检(对照验收标准)
 ```
 
-## 三、怎么演示（销售脚本）
+## 三、真实模型接入(可选)
 
-打开页面后从首页开始，**两种演示方式**：
+第一站翻译可调用真实 OpenAI,key 只存服务端、绝不进前端:
 
-### A. 手动逐站讲解
-1. **首页** —— 点右侧醒目的 **「加载示例装箱单」** 按钮进入流程。
-2. **第一站 · 智能转换** —— 中文品名逐行翻成亚马逊买家会搜的英文词，字段逐格点亮；
-   缺失海关编码的行会显示 **AI 推荐 + 待确认** 标。
-3. **第二站 · 数据库匹配** —— 四路并行检索，命中项显示 **语义相似度%**；
-   莲蓬头未命中，自动流入第三站。
-4. **第三站 · 亚马逊德国搜索（核心）** —— 顶部切换五种搜索策略观察候选洗牌；
-   每张卡有 **AI 相关性评分条**；点任意卡片，左侧滑出 **AI 详情页抽取面板**（逐行打字）；
-   卡片下方 **商标 / 材质 / 原产地三重核验** 逐个打勾或打叉；
-   全通过且综合分最高的卡片被 **AI 推荐**（绿框），点 **「人工确认（Yes）」** 固化。
-5. **第四站 · 固化对标** —— 链接锁定动画 + 最终合并表；未达标项有 **AI 异常归类 + 建议**。
-6. **投资回报** —— 大数字滚动、人工 vs RPA 对比图、AI 质检报告卡。点 **「重新演示」** 循环。
+- 后端代理:`api/translate.ts`(Vercel Serverless Function),读取环境变量
+  `OPENAI_API_KEY`,模型由 `OPENAI_MODEL` 控制(当前线上为 `gpt-5.4`)。
+- 运行时若未配置 key 或调用失败,**自动回退到内置脚本数据**,演示不会翻车。
+- 在 Vercel 项目 Settings → Environment Variables 配置 `OPENAI_API_KEY` 即可启用。
 
-> 顶部流水线导航可随时点击跳转到任意一站。
+## 四、技术栈
 
-### B. 自动演示模式（销售腾出手讲话）
-- 右上角打开 **「自动演示」** 开关：每站自动停留若干秒并推进，
-  底部出现 **旁白字幕条**（点出 AI 价值），销售全程不碰鼠标只讲解。
-- 右上角还有 **提示音开关**（默认关闭）和 **重新演示** 按钮。
-
-## 四、四大 AI 看点（演示时重点强调）
-
-1. **多模态相关性评分**（第三站）——AI 同时看图和标题判断是否同款，替代员工肉眼比对。
-2. **AI 详情页抽取**（第三站）——自动读详情页抽材质、原产地、揪出品牌词。
-3. **商标词研判 + EUIPO 商标库核验**（第三站）——AI 先判断哪个词像品牌再去查，命中注册商标即排除。
-4. **语义向量匹配**（第二站）——中文/英文/翻译名映射到同一语义空间，相似即命中，不靠死板关键词。
-
-候选剧情刻意设计了戏剧性：**品牌命中被排除**、**材质不符被排除**、**原产地非中国被排除**、
-**相关性过低沉底**、以及 **全通过被 AI 推荐** ——让客户看到 AI 真在做判断。
+Vite · React · TypeScript · Tailwind(浅色极简,单一靛蓝强调色)· Framer Motion(克制动效)· lucide-react。
+无登录、无数据库;数据走 `src/data/` 内置假数据。
 
 ## 五、项目结构
 
 ```
+api/translate.ts            OpenAI 翻译代理(Serverless,key 在服务端)
 src/
-├─ App.tsx                  流程状态机 + 整体编排
-├─ theme/design.ts          设计风格配置（配色 / 缓动 / 节奏）
-├─ hooks/
-│  ├─ useAutoPlay.ts        自动演示计时
-│  └─ useChime.ts           可选提示音（WebAudio 合成）
-├─ data/
-│  ├─ types.ts              数据类型
-│  ├─ packingList.ts        示例装箱单（12 个商品）
-│  ├─ amazonCandidates.ts   莲蓬头亚马逊候选 + 五种策略
-│  ├─ narration.ts          自动播放旁白脚本
-│  └─ roi.ts                投资回报 / 质检报告 / 异常归类数据
+├─ App.tsx                  指令 → 执行 → 审核 → 汇总 状态机
+├─ engine/review.ts         AI 自动填表(审核队列)+ AI 执行流 + 自然语言指令解析
+├─ lib/translate.ts         前端调用代理(失败回退脚本)
+├─ ui/motion.ts             统一动效常量
+├─ data/                    packingList / amazonCandidates / roi / types
 └─ components/
-   ├─ TopControls.tsx       顶部控制（自动演示 / 声音 / 重演）
-   ├─ PipelineNav.tsx       发光流水线导航
-   ├─ RobotStatusBar.tsx    常驻机器人状态条（打字）
-   ├─ UploadScreen.tsx      第零屏 · 上传
-   ├─ Stage1Translate.tsx   第一站 · 智能转换
-   ├─ Stage2Database.tsx    第二站 · 数据库匹配
-   ├─ Stage3Amazon.tsx      第三站 · 亚马逊搜索（核心）
-   ├─ Stage4Lock.tsx        第四站 · 固化对标
-   ├─ Stage5ROI.tsx         投资回报总结
-   ├─ AmazonCandidateCard.tsx  候选商品卡
-   ├─ RelevanceBar.tsx      AI 相关性评分条
-   ├─ VerificationBadge.tsx 三重核验徽章
-   ├─ AIExtractPanel.tsx    AI 详情页抽取面板
-   └─ common/               AnimatedNumber / AIBadge / PulseDot / SubtitleBar
+   ├─ Header.tsx            极简顶栏
+   ├─ CommandBar.tsx        自然语言指令输入(首页大输入 / 审核页底部)
+   ├─ AgentFeed.tsx         AI 执行流(自然语言进度)
+   ├─ ReviewTable.tsx       审核概览 + 队列
+   ├─ ReviewRow.tsx         单行:AI 填好的对标 + 通过/驳回 + 可展开依据
+   ├─ ResultSummary.tsx     汇总(耗时对比 / 质检)
+   └─ common/AnimatedNumber.tsx
+scripts/selftest.ts         自检脚本
 ```
 
 ## 六、改数据
 
-所有展示数据集中在 `src/data/`，可直接编辑：
-- 增删商品 → `packingList.ts`
-- 调整亚马逊候选剧情 → `amazonCandidates.ts`
-- 改投资回报大数字 / 质检报告 → `roi.ts`
-- 改旁白字幕 → `narration.ts`
-- 调每站自动停留时长 → `theme/design.ts` 里的 `AUTOPLAY_MS`
+- 增删商品 → `src/data/packingList.ts`
+- 调整亚马逊候选剧情(品牌/材质/原产地/相关性) → `src/data/amazonCandidates.ts`
+- 改 ROI / 质检 / 异常归类 → `src/data/roi.ts`
+- 改 AI 自动填表逻辑、执行流文案、指令关键词 → `src/engine/review.ts`
 
 ## 七、范围说明
 
-这是**销售演示**，不是生产系统：不接真实亚马逊 / 商标库 / 谷歌，不做后端与表格解析，
-全部假数据以保证演示稳定。客户签约后再按真实需求做生产版（浏览器自动化、真实商标库查询、
-真实 AI 翻译接口等）。
+这是**销售演示**:不接真实亚马逊 / 商标库 / 谷歌,审核动作只改本地状态。
+唯一接了真实接口的是第一站翻译(可选,且有回退)。客户签约后再按真实需求做生产版。

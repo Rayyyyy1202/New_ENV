@@ -4,67 +4,43 @@ export default {
   theme: {
     extend: {
       colors: {
-        // 指挥中心暗色科技风
-        bg: {
-          base: '#070b18', // 近黑深蓝背景
-          panel: '#0e1530', // 稍浅的深蓝面板
-          panel2: '#131c3d', // 卡片/二级面板
-          line: '#1e2a52', // 边框线
-        },
-        ink: {
-          DEFAULT: '#e8ecf8', // 接近白的主文字
-          dim: '#8a96bf', // 中灰次要文字
-          faint: '#566089', // 更暗的提示文字
-        },
-        // 主强调色 青色
-        cyan: {
-          DEFAULT: '#22d3ee',
-          soft: '#67e8f9',
-          deep: '#0891b2',
-        },
-        // 状态色
-        ok: '#34d399', // 通过/匹配 绿
-        warn: '#fbbf24', // 待确认/中等 琥珀
-        bad: '#f87171', // 不通过/品牌命中 红
-        // 亚马逊橙 仅用于亚马逊相关元素
-        amazon: '#ff9900',
+        canvas: '#f6f7f9', // 应用背景 · 近白浅灰
+        surface: '#ffffff', // 卡片/面板
+        line: '#e8eaef', // 边框
+        ink: '#16181d', // 主文字
+        muted: '#5b6270', // 次要文字
+        faint: '#9aa0ac', // 提示文字
+        // 单一主强调色 · 沉静的靛蓝
+        accent: '#5b5bd6',
+        accentSoft: '#eef0fb',
+        // 语义状态 · 克制使用
+        ok: '#16a34a',
+        okSoft: '#edf7f0',
+        warn: '#c2820a',
+        warnSoft: '#fbf4e6',
+        danger: '#dc2626',
+        dangerSoft: '#fceeee',
+        amazon: '#e07b00', // 仅用于欧元价格点睛
       },
       fontFamily: {
-        sans: ['"Inter"', '"Segoe UI"', 'system-ui', 'sans-serif'],
-        mono: ['"JetBrains Mono"', '"SFMono-Regular"', 'ui-monospace', 'monospace'],
-        display: ['"Orbitron"', '"Inter"', 'sans-serif'],
+        sans: ['Inter', 'system-ui', 'sans-serif'],
+        mono: ['"JetBrains Mono"', 'ui-monospace', 'monospace'],
       },
       boxShadow: {
-        glow: '0 0 0 1px rgba(34,211,238,0.4), 0 0 24px -4px rgba(34,211,238,0.45)',
-        'glow-ok': '0 0 0 1px rgba(52,211,153,0.5), 0 0 24px -4px rgba(52,211,153,0.5)',
-        'glow-bad': '0 0 0 1px rgba(248,113,113,0.5), 0 0 24px -4px rgba(248,113,113,0.5)',
-      },
-      transitionTimingFunction: {
-        cmd: 'cubic-bezier(0.22, 1, 0.36, 1)',
+        card: '0 1px 2px rgba(16,18,29,0.04), 0 1px 3px rgba(16,18,29,0.06)',
+        lift: '0 4px 16px -4px rgba(16,18,29,0.12)',
+        focus: '0 0 0 3px rgba(91,91,214,0.16)',
       },
       keyframes: {
-        pulseDot: {
-          '0%,100%': { opacity: '1', transform: 'scale(1)' },
-          '50%': { opacity: '0.4', transform: 'scale(0.7)' },
+        shimmer: {
+          '0%': { backgroundPosition: '-200% 0' },
+          '100%': { backgroundPosition: '200% 0' },
         },
-        flowLine: {
-          '0%': { backgroundPosition: '0% 0%' },
-          '100%': { backgroundPosition: '200% 0%' },
-        },
-        blink: {
-          '0%,100%': { opacity: '1' },
-          '50%': { opacity: '0' },
-        },
-        gridMove: {
-          '0%': { backgroundPosition: '0 0' },
-          '100%': { backgroundPosition: '60px 60px' },
-        },
+        blink: { '0%,100%': { opacity: '1' }, '50%': { opacity: '0' } },
       },
       animation: {
-        pulseDot: 'pulseDot 1.2s ease-in-out infinite',
-        flowLine: 'flowLine 2.5s linear infinite',
+        shimmer: 'shimmer 1.6s linear infinite',
         blink: 'blink 1s step-end infinite',
-        gridMove: 'gridMove 14s linear infinite',
       },
     },
   },

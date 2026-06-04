@@ -22,8 +22,10 @@ export interface ReviewItem {
   title: string
   priceEur: number
   confidence: number // AI 置信度 0-100
-  reasoning: string // AI 为什么这么填(一句话)
-  // 审核时可展开的依据
+  reasoning: string // AI 结论(一句话)
+  // —— 详细决策依据 ——
+  searchPath: string // 这条链接是"怎么找到"的(检索路径)
+  evidence: string[] // 为什么是它(证据点)
   buyerTerms: string[]
   semantic?: number
   checks?: { trademark: boolean; material: boolean; origin: boolean }
@@ -64,7 +66,16 @@ export function buildReviewItems(): ReviewItem[] {
         title: win.title,
         priceEur: win.priceEur,
         confidence: win.relevance,
-        reasoning: win.reason ?? '综合相关性、评论与核验结果择优',
+        reasoning: win.reason ?? '综合相关性、评论与核验后择优,这条最匹配',
+        searchPath: `历史库无对标 → 亚马逊德国 5 策略搜索 → 多模态相关性评分 → 三重核验 → 综合择优(共比对 ${showerHeadCandidates.length} 个候选)`,
+        evidence: [
+          `多模态相关性 ${win.relevance}%:看商品图+标题判定为同款莲蓬头`,
+          `口碑过硬:${win.reviews.toLocaleString()} 条评论 · ${win.stars}★`,
+          `价格合理:€${win.priceEur.toFixed(2)},处于候选价区间内`,
+          `商标核验通过:非注册品牌(已过 EUIPO 欧盟商标库)`,
+          `材质核验通过:抽取「${win.extractedMaterial}」与装箱单一致`,
+          `原产地核验通过:抽取「${win.extractedOrigin}」,符合中国要求`,
+        ],
         checks: { trademark: true, material: true, origin: true },
         rejectedCandidates: rejected,
         needsReview: false,
@@ -81,7 +92,14 @@ export function buildReviewItems(): ReviewItem[] {
         title: p.historyTitle ?? '—',
         priceEur: p.historyPriceEur ?? 0,
         confidence: p.semantic,
-        reasoning: `${ex.reason}；建议：${ex.suggestion}`,
+        reasoning: `${ex.reason}；建议:${ex.suggestion}`,
+        searchPath: `语义向量检索命中历史库,但相似度仅 ${p.semantic}%(低于自动通过阈值)`,
+        evidence: [
+          `历史对标「${p.historyTitle}」语义相似度 ${p.semantic}%`,
+          `原因:${ex.reason}`,
+          `AI 建议:${ex.suggestion}`,
+          `已自动标记为「重点复核」,等待你定夺`,
+        ],
         semantic: p.semantic,
         needsReview: true,
       }
@@ -95,7 +113,13 @@ export function buildReviewItems(): ReviewItem[] {
       title: p.historyTitle ?? '—',
       priceEur: p.historyPriceEur ?? 0,
       confidence: p.semantic,
-      reasoning: `历史库语义命中 ${p.semantic}%,直接复用既有对标`,
+      reasoning: `历史库语义命中 ${p.semantic}%,复用既有对标(高置信)`,
+      searchPath: `语义向量检索:把中文/英文/翻译名映射到同一语义空间 → 命中历史对标库(相似度 ${p.semantic}%)`,
+      evidence: [
+        `与历史对标「${p.historyTitle}」语义相似度 ${p.semantic}%`,
+        `历史已人工确认过的对标,直接复用,无需重搜`,
+        `欧元参考价 €${(p.historyPriceEur ?? 0).toFixed(2)}`,
+      ],
       semantic: p.semantic,
       needsReview: false,
     }

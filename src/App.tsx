@@ -201,10 +201,11 @@ export default function App() {
                 <Sparkles size={13} /> AI 自动对标 · 你只需审核
               </div>
               <h1 className="text-3xl font-bold tracking-tight text-ink sm:text-4xl">
-                用一句话,给装箱单找好亚马逊对标
+                更聪明地找到对标链接,<br className="hidden sm:block" />并讲清每一条的理由
               </h1>
-              <p className="mx-auto mt-3 max-w-md text-[15px] text-muted">
-                输入指令,AI 自动完成翻译、查库、亚马逊德国搜索与商标/材质/原产地核验,把对标链接<b className="text-ink">填好表</b>交给你审核。
+              <p className="mx-auto mt-3 max-w-lg text-[15px] text-muted">
+                一句话指令,AI 自动翻译、查库、亚马逊德国多策略搜索 + 商标/材质/原产地核验,
+                <b className="text-ink">把对标链接填好表</b>,并对<b className="text-ink">每一条说清为什么是它</b>——你只需审核。
               </p>
 
               {/* 对话记录 */}

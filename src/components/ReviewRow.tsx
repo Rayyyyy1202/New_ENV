@@ -12,6 +12,8 @@ import {
   ShoppingCart,
   ShieldCheck,
   ShieldX,
+  Route,
+  ListChecks,
 } from 'lucide-react'
 import type { ReviewItem } from '../engine/review'
 import { amazonSearchUrl } from '../lib/amazon'
@@ -96,9 +98,9 @@ export default function ReviewRow({ item, live, onApprove, onReject, onUndo }: P
             <span className="tnum text-[11px] text-faint">AI 置信度 {item.confidence}%</span>
             <button
               onClick={() => setOpen((v) => !v)}
-              className="ml-1 flex items-center gap-0.5 text-[11px] text-accent hover:underline"
+              className="ml-1 flex items-center gap-0.5 rounded-md bg-accentSoft px-1.5 py-0.5 text-[11px] font-medium text-accent hover:bg-accent/15"
             >
-              查看依据 <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
+              {open ? '收起' : '为什么是它'} <ChevronDown size={12} className={`transition-transform ${open ? 'rotate-180' : ''}`} />
             </button>
           </div>
         </div>
@@ -146,33 +148,44 @@ export default function ReviewRow({ item, live, onApprove, onReject, onUndo }: P
             animate={{ height: 'auto', opacity: 1 }}
             exit={{ height: 0, opacity: 0 }}
             transition={{ duration: 0.25, ease: EASE }}
-            className="overflow-hidden border-t border-line"
+            className="overflow-hidden border-t border-line bg-canvas/40"
           >
-            <div className="space-y-3 p-3.5 text-[12px]">
-              <Audit label="原始品名">
-                <span className="text-muted">
-                  {item.rawName} <span className="text-faint">· {item.rawKind}</span>
-                </span>
-              </Audit>
-              <Audit label="AI 翻译 / 买家搜索词">
-                <span className="tnum text-muted">{item.buyerTerms.join(' · ')}</span>
-              </Audit>
-              {item.semantic != null && (
-                <Audit label="语义相似度">
-                  <span className="tnum text-ink">{item.semantic}%</span>
-                </Audit>
-              )}
+            <div className="space-y-3.5 p-4 text-[12px]">
+              <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-accent">
+                <Sparkles size={12} /> AI 决策报告
+              </div>
+
+              {/* 怎么找到的 */}
+              <Block icon={<Route size={13} className="text-accent" />} title="怎么找到的">
+                <p className="text-muted">{item.searchPath}</p>
+              </Block>
+
+              {/* 为什么是它 */}
+              <Block icon={<ListChecks size={13} className="text-accent" />} title="为什么是它">
+                <ul className="space-y-1">
+                  {item.evidence.map((e, i) => (
+                    <li key={i} className="flex items-start gap-1.5 text-ink">
+                      <Check size={12} className="mt-0.5 shrink-0 text-ok" />
+                      <span>{e}</span>
+                    </li>
+                  ))}
+                </ul>
+              </Block>
+
+              {/* 三重核验 */}
               {item.checks && (
-                <Audit label="三重核验">
+                <Block icon={<ShieldCheck size={13} className="text-accent" />} title="三重核验">
                   <div className="flex flex-wrap gap-1.5">
                     <CheckChip ok={item.checks.trademark} label="商标(非品牌)" />
                     <CheckChip ok={item.checks.material} label="材质匹配" />
                     <CheckChip ok={item.checks.origin} label="原产地中国" />
                   </div>
-                </Audit>
+                </Block>
               )}
+
+              {/* 已排除 */}
               {item.rejectedCandidates && item.rejectedCandidates.length > 0 && (
-                <Audit label={`AI 已排除 ${item.rejectedCandidates.length} 个候选`}>
+                <Block icon={<X size={13} className="text-danger" />} title={`同时排除了 ${item.rejectedCandidates.length} 个候选`}>
                   <ul className="space-y-1">
                     {item.rejectedCandidates.map((r, i) => (
                       <li key={i} className="flex items-start gap-1.5 text-muted">
@@ -183,8 +196,13 @@ export default function ReviewRow({ item, live, onApprove, onReject, onUndo }: P
                       </li>
                     ))}
                   </ul>
-                </Audit>
+                </Block>
               )}
+
+              <div className="border-t border-line pt-2 text-[11px] text-faint">
+                原始品名:{item.rawName} · {item.rawKind} ｜ AI 搜索词:
+                <span className="tnum">{item.buyerTerms.join(' · ')}</span>
+              </div>
             </div>
           </motion.div>
         )}
@@ -205,11 +223,14 @@ function SourceTag({ source }: { source: ReviewItem['source'] }) {
   )
 }
 
-function Audit({ label, children }: { label: string; children: React.ReactNode }) {
+function Block({ icon, title, children }: { icon: React.ReactNode; title: string; children: React.ReactNode }) {
   return (
-    <div className="grid grid-cols-[96px_1fr] gap-3">
-      <span className="text-faint">{label}</span>
-      <div>{children}</div>
+    <div className="rounded-lg border border-line bg-surface p-2.5">
+      <div className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold text-ink">
+        {icon}
+        {title}
+      </div>
+      {children}
     </div>
   )
 }

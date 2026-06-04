@@ -14,6 +14,7 @@ import {
   ShieldX,
 } from 'lucide-react'
 import type { ReviewItem } from '../engine/review'
+import { amazonSearchUrl } from '../lib/amazon'
 import { EASE } from '../ui/motion'
 
 interface Props {
@@ -66,12 +67,18 @@ export default function ReviewRow({ item, live, onApprove, onReject, onUndo }: P
 
           {/* AI 自动填好的对标 */}
           <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[12px]">
-            <span className="flex items-center gap-1 text-muted">
-              <ExternalLink size={11} className="text-faint" />
-              <span className="tnum truncate text-ink">{item.title}</span>
-            </span>
+            <span className="tnum truncate text-ink">{item.title}</span>
             <span className="tnum text-amazon">€{item.priceEur.toFixed(2)}</span>
-            <span className="tnum text-faint">{item.link}</span>
+            <a
+              href={amazonSearchUrl(item.buyerTerms, item.product)}
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="tnum flex items-center gap-1 text-accent hover:underline"
+              title="在 Amazon.de 打开真实搜索结果"
+            >
+              <ExternalLink size={11} /> 在 Amazon.de 查看
+            </a>
           </div>
 
           {/* AI 理由 + 置信度 */}

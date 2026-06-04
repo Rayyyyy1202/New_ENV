@@ -3,6 +3,7 @@ import { CheckCircle2, RotateCcw, Gauge, Clock, ShieldCheck, Swords, Download, C
 import { useState } from 'react'
 import AnimatedNumber from './common/AnimatedNumber'
 import type { ReviewItem } from '../engine/review'
+import { amazonSearchUrl } from '../lib/amazon'
 import { roi } from '../data/roi'
 import { fadeUp } from '../ui/motion'
 
@@ -24,7 +25,7 @@ export default function ResultSummary({
   const headers = ['商品', '对标亚马逊链接', '亚马逊品名', '欧元售价', '来源', 'AI置信度', '状态']
   const rows = approvedItems.map((i) => [
     i.product,
-    i.link,
+    amazonSearchUrl(i.buyerTerms, i.product),
     i.title,
     `€${i.priceEur.toFixed(2)}`,
     i.source === 'amazon' ? '亚马逊新对标' : '历史复用',
@@ -106,9 +107,14 @@ export default function ResultSummary({
                     {i.product}
                   </td>
                   <td className="px-3 py-2">
-                    <span className="tnum flex items-center gap-1 text-accent">
-                      <ExternalLink size={11} /> {i.link}
-                    </span>
+                    <a
+                      href={amazonSearchUrl(i.buyerTerms, i.product)}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="tnum flex items-center gap-1 text-accent hover:underline"
+                    >
+                      <ExternalLink size={11} /> 在 Amazon.de 查看
+                    </a>
                     <span className="block truncate text-faint">{i.title}</span>
                   </td>
                   <td className="tnum px-3 py-2 text-right text-amazon">€{i.priceEur.toFixed(2)}</td>

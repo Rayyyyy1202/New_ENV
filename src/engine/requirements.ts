@@ -89,6 +89,69 @@ export function satisfiedChecklist(req: Requirements): string {
   return parts.join(' · ')
 }
 
+// ───────── 可保存的常用要求预设 ─────────
+export interface Preset {
+  id: string
+  name: string
+  req: Requirements
+  builtin?: boolean
+}
+
+export const builtinPresets: Preset[] = [
+  { id: 'safe', name: '稳妥合规', builtin: true, req: defaultRequirements },
+  {
+    id: 'cost',
+    name: '成本优先',
+    builtin: true,
+    req: { ...defaultRequirements, minReviews: 100, minStars: 0, objective: 'cheapest' },
+  },
+  {
+    id: 'reputation',
+    name: '口碑优先',
+    builtin: true,
+    req: { ...defaultRequirements, minReviews: 1000, minStars: 4.5, objective: 'cheapest' },
+  },
+  {
+    id: 'target15',
+    name: '对标 €15',
+    builtin: true,
+    req: { ...defaultRequirements, minReviews: 100, objective: 'target', targetPriceEur: 15 },
+  },
+]
+
+const LS_KEY = 'linkfinder.presets'
+
+export function loadCustomPresets(): Preset[] {
+  try {
+    const raw = localStorage.getItem(LS_KEY)
+    return raw ? (JSON.parse(raw) as Preset[]) : []
+  } catch {
+    return []
+  }
+}
+
+export function saveCustomPreset(name: string, req: Requirements): Preset {
+  const preset: Preset = { id: 'u' + Date.now(), name, req }
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify([...loadCustomPresets(), preset]))
+  } catch {
+    /* 忽略 */
+  }
+  return preset
+}
+
+export function deleteCustomPreset(id: string) {
+  try {
+    localStorage.setItem(LS_KEY, JSON.stringify(loadCustomPresets().filter((p) => p.id !== id)))
+  } catch {
+    /* 忽略 */
+  }
+}
+
+export function sameReq(a: Requirements, b: Requirements): boolean {
+  return JSON.stringify(a) === JSON.stringify(b)
+}
+
 // 从自然语言里抽取要求(轻量,合并进现有要求)
 export function parseNlRequirements(text: string, base: Requirements): Requirements {
   const r = { ...base }

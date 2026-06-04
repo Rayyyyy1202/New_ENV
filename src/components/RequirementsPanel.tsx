@@ -1,7 +1,16 @@
 import { useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { SlidersHorizontal, ChevronDown } from 'lucide-react'
-import { type Requirements, summarizeRequirements } from '../engine/requirements'
+import { SlidersHorizontal, ChevronDown, Bookmark, BookmarkPlus, X } from 'lucide-react'
+import {
+  type Requirements,
+  type Preset,
+  summarizeRequirements,
+  builtinPresets,
+  loadCustomPresets,
+  saveCustomPreset,
+  deleteCustomPreset,
+  sameReq,
+} from '../engine/requirements'
 import { EASE } from '../ui/motion'
 
 interface Props {
@@ -12,7 +21,20 @@ interface Props {
 // 选品要求面板(user 可自定义):要求 + 条件 + 目标。
 export default function RequirementsPanel({ req, onChange }: Props) {
   const [open, setOpen] = useState(false)
+  const [custom, setCustom] = useState<Preset[]>(() => loadCustomPresets())
   const set = (patch: Partial<Requirements>) => onChange({ ...req, ...patch })
+
+  const allPresets = [...builtinPresets, ...custom]
+  function saveCurrent() {
+    const name = window.prompt('给这组要求起个名字:', '我的要求')
+    if (!name) return
+    saveCustomPreset(name.trim(), req)
+    setCustom(loadCustomPresets())
+  }
+  function removePreset(id: string) {
+    deleteCustomPreset(id)
+    setCustom(loadCustomPresets())
+  }
 
   return (
     <div className="rounded-2xl border border-line bg-surface shadow-card">
@@ -39,6 +61,41 @@ export default function RequirementsPanel({ req, onChange }: Props) {
             className="overflow-hidden border-t border-line"
           >
             <div className="space-y-4 p-4">
+              {/* 预设 */}
+              <div>
+                <div className="mb-2 flex items-center justify-between">
+                  <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-faint">
+                    <Bookmark size={12} className="text-accent" /> 常用预设
+                  </span>
+                  <button
+                    onClick={saveCurrent}
+                    className="flex items-center gap-1 rounded-md border border-line px-2 py-1 text-[11px] text-muted transition-colors hover:border-accent/40 hover:text-accent"
+                  >
+                    <BookmarkPlus size={12} /> 存为预设
+                  </button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {allPresets.map((p) => {
+                    const active = sameReq(req, p.req)
+                    return (
+                      <span
+                        key={p.id}
+                        className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] transition-colors ${
+                          active ? 'border-accent bg-accentSoft text-accent' : 'border-line text-muted hover:text-ink'
+                        }`}
+                      >
+                        <button onClick={() => onChange(p.req)}>{p.name}</button>
+                        {!p.builtin && (
+                          <button onClick={() => removePreset(p.id)} className="text-faint hover:text-danger">
+                            <X size={11} />
+                          </button>
+                        )}
+                      </span>
+                    )
+                  })}
+                </div>
+              </div>
+
               {/* 硬性要求 */}
               <div>
                 <div className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-faint">硬性要求</div>

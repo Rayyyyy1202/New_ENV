@@ -7,7 +7,7 @@ import { buildReviewItems, parseCommand, matchItemId } from '../src/engine/revie
 import { channels, workOrders } from '../src/data/inbox'
 import { steps as compareSteps, scores as compareScores, ordinaryPath, aiPath } from '../src/data/comparison'
 import { localReply } from '../src/lib/chat'
-import { evaluateCandidates, pickWinner, parseNlRequirements, defaultRequirements } from '../src/engine/requirements'
+import { evaluateCandidates, pickWinner, parseNlRequirements, defaultRequirements, builtinPresets, sameReq } from '../src/engine/requirements'
 import type { AmazonCandidate } from '../src/data/types'
 
 let pass = 0
@@ -93,6 +93,10 @@ console.log('\n【选品要求(可自定义)+ 择优目标】')
   check('"找最便宜的" → objective=cheapest', parseNlRequirements('找最便宜的', defaultRequirements).objective === 'cheapest')
   check('"目标价15欧" → target & 15', (() => { const r = parseNlRequirements('目标价15欧', defaultRequirements); return r.objective === 'target' && r.targetPriceEur === 15 })())
   check('"评论过千" → minReviews=1000', parseNlRequirements('评论过千的', { ...defaultRequirements, minReviews: 0 }).minReviews === 1000)
+  // 预设
+  check('内置预设 >= 4 个', builtinPresets.length >= 4)
+  check('含"对标 €15"目标价预设', builtinPresets.some((p) => p.req.objective === 'target' && p.req.targetPriceEur === 15))
+  check('sameReq 能判定预设是否生效', sameReq(defaultRequirements, defaultRequirements) && !sameReq(defaultRequirements, { ...defaultRequirements, minReviews: 1 }))
 }
 
 console.log('\n【自然语言对话(本地兜底)】')

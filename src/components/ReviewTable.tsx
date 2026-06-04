@@ -1,5 +1,5 @@
 import { motion } from 'framer-motion'
-import { CheckCheck, ArrowRight, Zap } from 'lucide-react'
+import { CheckCheck, ArrowRight, Zap, Filter } from 'lucide-react'
 import type { ReviewItem } from '../engine/review'
 import ReviewRow from './ReviewRow'
 import { listStagger, fadeUp } from '../ui/motion'
@@ -8,6 +8,7 @@ interface Props {
   items: ReviewItem[]
   liveModel?: string
   autoRun?: boolean
+  reqSummary?: string
   onApprove: (id: string) => void
   onReject: (id: string) => void
   onUndo: (id: string) => void
@@ -15,7 +16,7 @@ interface Props {
   onFinish: () => void
 }
 
-export default function ReviewTable({ items, liveModel, autoRun, onApprove, onReject, onUndo, onApproveAll, onFinish }: Props) {
+export default function ReviewTable({ items, liveModel, autoRun, reqSummary, onApprove, onReject, onUndo, onApproveAll, onFinish }: Props) {
   const pending = items.filter((i) => i.status === 'pending').length
   const approved = items.filter((i) => i.status === 'approved').length
   const rejected = items.filter((i) => i.status === 'rejected').length
@@ -43,6 +44,11 @@ export default function ReviewTable({ items, liveModel, autoRun, onApprove, onRe
             <span className="text-danger">已驳回 <span className="tnum font-medium">{rejected}</span></span>
             {liveModel && <span className="text-faint">· 翻译模型 {liveModel}</span>}
           </div>
+          {reqSummary && (
+            <div className="mt-1 flex items-center gap-1.5 text-[11px] text-muted">
+              <Filter size={11} className="text-accent" /> 按你的要求:{reqSummary}
+            </div>
+          )}
         </div>
         <div className="flex items-center gap-2">
           {!allDecided ? (

@@ -8,7 +8,14 @@ import ReviewTable from './components/ReviewTable'
 import ResultSummary from './components/ResultSummary'
 import ComparisonView from './components/ComparisonView'
 import InboxPanel from './components/InboxPanel'
+import RequirementsPanel from './components/RequirementsPanel'
 import type { OrderOrigin, WorkOrder } from './data/inbox'
+import {
+  defaultRequirements,
+  parseNlRequirements,
+  summarizeRequirements,
+  type Requirements,
+} from './engine/requirements'
 import {
   buildReviewItems,
   buildAgentSteps,
@@ -34,6 +41,7 @@ export default function App() {
   const [origin, setOrigin] = useState<OrderOrigin | undefined>()
   const [autoAccept, setAutoAccept] = useState(false)
   const [autoRun, setAutoRun] = useState(false)
+  const [requirements, setRequirements] = useState<Requirements>(defaultRequirements)
   // 对话
   const [messages, setMessages] = useState<ChatTurn[]>([])
   const [thinking, setThinking] = useState(false)
@@ -57,10 +65,12 @@ export default function App() {
   }, [])
 
   // 启动一次对标运行(可来自手动指令,或某渠道工单);auto=AI 自动受理模式
-  const startRun = useCallback((text: string, orderOrigin?: OrderOrigin, auto = false) => {
+  const startRun = useCallback(
+    (text: string, orderOrigin?: OrderOrigin, auto = false, reqOverride?: Requirements) => {
+    const req = reqOverride ?? requirements
     const cmd = parseCommand(text, 'idle')
     const only = cmd.kind === 'run' ? cmd.only : undefined
-    let built = buildReviewItems()
+    let built = buildReviewItems(req)
     if (only) built = built.filter((i) => i.id === only)
 
     setInstruction(text)
@@ -91,7 +101,9 @@ export default function App() {
       )
       setLiveModel(res.model)
     })
-  }, [])
+    },
+    [requirements],
+  )
 
   // 从某渠道工单受理:读取聊天记录里提取的指令并启动
   const pickWorkOrder = useCallback(
@@ -146,18 +158,24 @@ export default function App() {
     [startRun, approveAll, setStatus],
   )
 
-  // 首页对话:先听懂是提问还是命令,提问就回答、命令才执行
+  // 首页对话:先听懂是提问还是命令,提问就回答、命令才执行;并从自然语言抽取要求
   const handleIdleSubmit = useCallback(
     async (text: string) => {
       const history = messages
+      const newReq = parseNlRequirements(text, requirements)
+      setRequirements(newReq)
       setMessages((prev) => [...prev, { role: 'user', text }])
       setThinking(true)
       const res = await chat(text, 'idle', history)
       setThinking(false)
       setMessages((prev) => [...prev, { role: 'assistant', text: res.reply }])
-      executeAction(res.action)
+      if (res.action.type === 'run') {
+        startRun(res.action.instruction || text, undefined, false, newReq)
+      } else {
+        executeAction(res.action)
+      }
     },
-    [messages, executeAction],
+    [messages, executeAction, requirements, startRun],
   )
 
   // 审核阶段对话
@@ -225,6 +243,10 @@ export default function App() {
                   hint="支持自然语言对话 · 回车发送 · 内置示例装箱单"
                   onSubmit={handleIdleSubmit}
                 />
+              </div>
+
+              <div className="mt-3 text-left">
+                <RequirementsPanel req={requirements} onChange={setRequirements} />
               </div>
 
               <div className="mt-4 flex flex-wrap justify-center gap-2">
@@ -295,6 +317,7 @@ export default function App() {
                   items={items}
                   liveModel={liveModel}
                   autoRun={autoRun}
+                  reqSummary={summarizeRequirements(requirements)}
                   onApprove={(id) => setStatus(id, 'approved')}
                   onReject={(id) => setStatus(id, 'rejected')}
                   onUndo={(id) => setStatus(id, 'pending')}

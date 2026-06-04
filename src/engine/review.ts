@@ -1,7 +1,13 @@
 import { packingList } from '../data/packingList'
-import { showerHeadCandidates, bestCandidate } from '../data/amazonCandidates'
+import { showerHeadCandidates } from '../data/amazonCandidates'
 import { exceptions } from '../data/roi'
-import type { AmazonCandidate } from '../data/types'
+import {
+  evaluateCandidates,
+  pickWinner,
+  satisfiedChecklist,
+  defaultRequirements,
+  type Requirements,
+} from './requirements'
 
 // 一行"AI 自动填好、待人工审核"的对标结果。
 export type ReviewStatus = 'pending' | 'approved' | 'rejected'
@@ -36,12 +42,8 @@ export interface ReviewItem {
 
 const exceptionMap = new Map(exceptions.map((e) => [e.id, e]))
 
-function excluded(c: AmazonCandidate) {
-  return c.trademark === 'fail' || c.materialCheck === 'fail' || c.originCheck === 'fail' || c.relevance < 60
-}
-
-// 由内置数据构建"AI 已自动填表"的审核队列。
-export function buildReviewItems(): ReviewItem[] {
+// 由内置数据构建"AI 已自动填表"的审核队列。按 user 要求筛选 + 择优。
+export function buildReviewItems(req: Requirements = defaultRequirements): ReviewItem[] {
   return packingList.map((p) => {
     const base = {
       id: p.id,
@@ -53,30 +55,52 @@ export function buildReviewItems(): ReviewItem[] {
       status: 'pending' as ReviewStatus,
     }
 
-    // 主演:莲蓬头走亚马逊实时搜索 + 三重核验 + 综合择优
+    // 主演:莲蓬头走亚马逊实时搜索 → 按要求筛选 → 最便宜/目标价择优
     if (p.db === 'miss') {
-      const win = bestCandidate()
-      const rejected: RejectedCandidate[] = showerHeadCandidates
-        .filter((c) => c.id !== win.id && excluded(c) && c.excludeReason)
-        .map((c) => ({ title: c.title, reason: c.excludeReason! }))
+      const { qualifying, rejected } = evaluateCandidates(showerHeadCandidates, req)
+      const win = pickWinner(qualifying, req)
+      const objText =
+        req.objective === 'cheapest'
+          ? '合格候选中最便宜'
+          : `最接近目标价 €${req.targetPriceEur}`
+
+      // 没有满足要求的候选 → 异常,转人工
+      if (!win) {
+        return {
+          ...base,
+          source: 'amazon' as const,
+          link: '—',
+          title: '未找到满足要求的对标',
+          priceEur: 0,
+          confidence: 0,
+          reasoning: '按当前要求无合格候选,建议放宽条件(如降低评论门槛)或换搜索词',
+          searchPath: `亚马逊德国 5 策略搜索 → 按你的要求筛选 → ${showerHeadCandidates.length} 个候选全部未达标`,
+          evidence: rejected.map((r) => `✗ ${r.title}:${r.reason}`),
+          rejectedCandidates: rejected,
+          needsReview: true,
+        }
+      }
+
       return {
         ...base,
-        source: 'amazon',
+        source: 'amazon' as const,
         link: 'amazon.de/dp/B0CKSHOWER9',
         title: win.title,
         priceEur: win.priceEur,
         confidence: win.relevance,
-        reasoning: win.reason ?? '综合相关性、评论与核验后择优,这条最匹配',
-        searchPath: `历史库无对标 → 亚马逊德国 5 策略搜索 → 多模态相关性评分 → 三重核验 → 综合择优(共比对 ${showerHeadCandidates.length} 个候选)`,
+        reasoning: `满足你设定的全部要求,且为${objText}(€${win.priceEur.toFixed(2)})`,
+        searchPath: `历史库无对标 → 亚马逊德国 5 策略搜索 → 多模态相关性 + 三重核验 → 按你的要求筛选 → 在 ${qualifying.length} 个合格候选里${req.objective === 'cheapest' ? '选最便宜' : '选最接近目标价'}(共比对 ${showerHeadCandidates.length} 个)`,
         evidence: [
-          `多模态相关性 ${win.relevance}%:看商品图+标题判定为同款莲蓬头`,
-          `口碑过硬:${win.reviews.toLocaleString()} 条评论 · ${win.stars}★`,
-          `价格合理:€${win.priceEur.toFixed(2)},处于候选价区间内`,
-          `商标核验通过:非注册品牌(已过 EUIPO 欧盟商标库)`,
-          `材质核验通过:抽取「${win.extractedMaterial}」与装箱单一致`,
-          `原产地核验通过:抽取「${win.extractedOrigin}」,符合中国要求`,
+          `选品目标:${objText} → 选中 €${win.priceEur.toFixed(2)}`,
+          `满足要求:${satisfiedChecklist(req)}`,
+          `相关性 ${win.relevance}% · 评论 ${win.reviews.toLocaleString()} · ${win.stars}★`,
+          `材质「${win.extractedMaterial}」· 原产地「${win.extractedOrigin}」`,
         ],
-        checks: { trademark: true, material: true, origin: true },
+        checks: {
+          trademark: win.trademark === 'pass',
+          material: win.materialCheck === 'pass',
+          origin: win.originCheck === 'pass',
+        },
         rejectedCandidates: rejected,
         needsReview: false,
       }

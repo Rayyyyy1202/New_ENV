@@ -7,6 +7,7 @@ import { buildReviewItems, parseCommand, matchItemId } from '../src/engine/revie
 import { channels, workOrders } from '../src/data/inbox'
 import { steps as compareSteps, scores as compareScores, ordinaryPath, aiPath } from '../src/data/comparison'
 import { localReply } from '../src/lib/chat'
+import { evaluateCandidates, pickWinner, parseNlRequirements, defaultRequirements } from '../src/engine/requirements'
 import type { AmazonCandidate } from '../src/data/types'
 
 let pass = 0
@@ -72,6 +73,27 @@ check('"驳回莲蓬头" → reject p09', JSON.stringify(parseCommand('驳回莲
 check('"通过瑜伽垫" → approve p03', JSON.stringify(parseCommand('通过瑜伽垫', 'review')) === JSON.stringify({ kind: 'approve', match: 'p03' }))
 check('"只处理莲蓬头" → run only p09', JSON.stringify(parseCommand('只处理莲蓬头', 'idle')) === JSON.stringify({ kind: 'run', only: 'p09' }))
 check('关键词匹配 shower → p09', matchItemId('帮我看看 shower head') === 'p09')
+
+console.log('\n【选品要求(可自定义)+ 择优目标】')
+{
+  // 默认:排除品牌+原产地中国+材质匹配+评论≥1000+评分≥4 → 在合格者里选最便宜
+  const { qualifying, rejected } = evaluateCandidates(showerHeadCandidates, defaultRequirements)
+  const winCheap = pickWinner(qualifying, defaultRequirements)
+  check('默认要求会筛掉不合格候选', rejected.length > 0 && qualifying.length >= 1)
+  check('默认目标"最便宜"→选合格者中最低价', !!winCheap && winCheap.priceEur === Math.min(...qualifying.map((c) => c.priceEur)))
+  // 目标价 €17 → 选最接近的
+  const target17 = { ...defaultRequirements, objective: 'target' as const, targetPriceEur: 17 }
+  const winT = pickWinner(evaluateCandidates(showerHeadCandidates, target17).qualifying, target17)
+  check('目标价 €17 → 选最接近价格的候选', !!winT && winT.priceEur === 16.99)
+  // 放宽评论门槛到 100 → 会纳入更多候选,最便宜更低
+  const loose = { ...defaultRequirements, minReviews: 100 }
+  const winLoose = pickWinner(evaluateCandidates(showerHeadCandidates, loose).qualifying, loose)
+  check('放宽评论门槛 → 命中更便宜的候选', !!winLoose && winLoose.priceEur < (winCheap?.priceEur ?? 999))
+  // 自然语言抽取要求
+  check('"找最便宜的" → objective=cheapest', parseNlRequirements('找最便宜的', defaultRequirements).objective === 'cheapest')
+  check('"目标价15欧" → target & 15', (() => { const r = parseNlRequirements('目标价15欧', defaultRequirements); return r.objective === 'target' && r.targetPriceEur === 15 })())
+  check('"评论过千" → minReviews=1000', parseNlRequirements('评论过千的', { ...defaultRequirements, minReviews: 0 }).minReviews === 1000)
+}
 
 console.log('\n【自然语言对话(本地兜底)】')
 check('提问"你可以自动填表吗" → 不擅自开跑(none)', localReply('你可以自动填表吗', 'idle').action.type === 'none')

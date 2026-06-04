@@ -1,5 +1,6 @@
 import { motion } from 'framer-motion'
-import { CheckCircle2, RotateCcw, Gauge, Clock, ShieldCheck, Swords } from 'lucide-react'
+import { CheckCircle2, RotateCcw, Gauge, Clock, ShieldCheck, Swords, Download, Copy, ExternalLink, Table2 } from 'lucide-react'
+import { useState } from 'react'
 import AnimatedNumber from './common/AnimatedNumber'
 import type { ReviewItem } from '../engine/review'
 import { roi } from '../data/roi'
@@ -14,9 +15,44 @@ export default function ResultSummary({
   onReset: () => void
   onCompare: () => void
 }) {
-  const approved = items.filter((i) => i.status === 'approved').length
+  const approvedItems = items.filter((i) => i.status === 'approved')
+  const approved = approvedItems.length
   const rejected = items.filter((i) => i.status === 'rejected').length
   const avgConf = Math.round(items.reduce((s, i) => s + i.confidence, 0) / Math.max(items.length, 1))
+  const [copied, setCopied] = useState(false)
+
+  const headers = ['商品', '对标亚马逊链接', '亚马逊品名', '欧元售价', '来源', 'AI置信度', '状态']
+  const rows = approvedItems.map((i) => [
+    i.product,
+    i.link,
+    i.title,
+    `€${i.priceEur.toFixed(2)}`,
+    i.source === 'amazon' ? '亚马逊新对标' : '历史复用',
+    `${i.confidence}%`,
+    '已通过',
+  ])
+
+  function downloadCsv() {
+    const csv = [headers, ...rows].map((r) => r.map((c) => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n')
+    const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8' }) // BOM 兼容 Excel 中文
+    const url = URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `对标结果_${new Date().toISOString().slice(0, 10)}.csv`
+    a.click()
+    URL.revokeObjectURL(url)
+  }
+
+  async function copyTable() {
+    const tsv = [headers, ...rows].map((r) => r.join('\t')).join('\n')
+    try {
+      await navigator.clipboard.writeText(tsv)
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1800)
+    } catch {
+      /* 忽略 */
+    }
+  }
 
   return (
     <motion.div variants={fadeUp} initial="hidden" animate="show" className="space-y-4">
@@ -28,6 +64,76 @@ export default function ResultSummary({
         <p className="mt-1 text-[13px] text-muted">
           AI 自动填好 {items.length} 项,你通过 {approved} 项、驳回 {rejected} 项,已回写数据库
         </p>
+      </div>
+
+      {/* 最终对标表(AI 填好、你已通过的结果) */}
+      <div className="overflow-hidden rounded-2xl border border-line bg-surface shadow-card">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-line px-4 py-3">
+          <span className="flex items-center gap-2 text-[13px] font-semibold text-ink">
+            <Table2 size={15} className="text-accent" /> 最终对标表 · {approved} 条(已回写数据库)
+          </span>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={copyTable}
+              className="flex items-center gap-1.5 rounded-lg border border-line px-2.5 py-1.5 text-[12px] text-muted transition-colors hover:border-accent/40 hover:text-accent"
+            >
+              <Copy size={13} /> {copied ? '已复制' : '复制'}
+            </button>
+            <button
+              onClick={downloadCsv}
+              className="flex items-center gap-1.5 rounded-lg bg-accent px-2.5 py-1.5 text-[12px] font-semibold text-white transition-opacity hover:opacity-90"
+            >
+              <Download size={13} /> 下载 CSV
+            </button>
+          </div>
+        </div>
+        <div className="max-h-[320px] overflow-auto">
+          <table className="w-full text-left text-[12px]">
+            <thead className="sticky top-0 bg-canvas/95 text-[11px] text-faint">
+              <tr>
+                <th className="px-4 py-2 font-medium">商品</th>
+                <th className="px-3 py-2 font-medium">对标链接 / 品名</th>
+                <th className="px-3 py-2 text-right font-medium">欧元价</th>
+                <th className="px-3 py-2 font-medium">来源</th>
+                <th className="px-3 py-2 text-right font-medium">置信度</th>
+              </tr>
+            </thead>
+            <tbody>
+              {approvedItems.map((i) => (
+                <tr key={i.id} className="border-t border-line/70">
+                  <td className="px-4 py-2 text-ink">
+                    <span className="mr-1">{i.emoji}</span>
+                    {i.product}
+                  </td>
+                  <td className="px-3 py-2">
+                    <span className="tnum flex items-center gap-1 text-accent">
+                      <ExternalLink size={11} /> {i.link}
+                    </span>
+                    <span className="block truncate text-faint">{i.title}</span>
+                  </td>
+                  <td className="tnum px-3 py-2 text-right text-amazon">€{i.priceEur.toFixed(2)}</td>
+                  <td className="px-3 py-2">
+                    <span
+                      className={`rounded-full px-2 py-0.5 text-[10px] ${
+                        i.source === 'amazon' ? 'bg-accentSoft text-accent' : 'bg-canvas text-muted'
+                      }`}
+                    >
+                      {i.source === 'amazon' ? '亚马逊新对标' : '历史复用'}
+                    </span>
+                  </td>
+                  <td className="tnum px-3 py-2 text-right text-muted">{i.confidence}%</td>
+                </tr>
+              ))}
+              {approvedItems.length === 0 && (
+                <tr>
+                  <td colSpan={5} className="px-4 py-6 text-center text-faint">
+                    本次没有通过的对标项
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
       </div>
 
       <div className="grid gap-3 sm:grid-cols-3">

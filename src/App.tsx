@@ -1,13 +1,13 @@
 import { useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Sparkles, FileSpreadsheet, ArrowRight } from 'lucide-react'
+import { Sparkles, FileSpreadsheet, ArrowRight, Inbox } from 'lucide-react'
 import Header from './components/Header'
 import CommandBar from './components/CommandBar'
 import AgentFeed from './components/AgentFeed'
 import ReviewTable from './components/ReviewTable'
 import ResultSummary from './components/ResultSummary'
 import ComparisonView from './components/ComparisonView'
-import InboxPanel from './components/InboxPanel'
+import ChannelSidebar from './components/ChannelSidebar'
 import RequirementsPanel from './components/RequirementsPanel'
 import type { OrderOrigin, WorkOrder } from './data/inbox'
 import {
@@ -42,6 +42,7 @@ export default function App() {
   const [autoAccept, setAutoAccept] = useState(false)
   const [autoRun, setAutoRun] = useState(false)
   const [requirements, setRequirements] = useState<Requirements>(defaultRequirements)
+  const [sidebarOpen, setSidebarOpen] = useState(false)
   // 对话
   const [messages, setMessages] = useState<ChatTurn[]>([])
   const [thinking, setThinking] = useState(false)
@@ -201,6 +202,18 @@ export default function App() {
         showReset={phase !== 'idle'}
         onCompare={() => setPhase('compare')}
         showCompare={phase !== 'compare'}
+        onChannels={() => setSidebarOpen(true)}
+      />
+
+      <ChannelSidebar
+        open={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+        onPickup={(o) => {
+          setSidebarOpen(false)
+          pickWorkOrder(o)
+        }}
+        autoAccept={autoAccept}
+        onToggleAuto={() => setAutoAccept((v) => !v)}
       />
 
       <main className="mx-auto max-w-5xl px-5 pb-40 pt-8">
@@ -268,26 +281,20 @@ export default function App() {
                 <FileSpreadsheet size={15} /> 或直接加载示例装箱单(12 个商品)
               </button>
 
-              {/* 渠道接入 + 工单收件箱 */}
-              <div className="mt-8 flex items-center gap-3 text-[12px] text-faint">
-                <span className="h-px flex-1 bg-line" />
-                或 · 让 AI 从已接入的渠道自动受理工单
-                <span className="h-px flex-1 bg-line" />
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] font-medium">
+                <button
+                  onClick={() => setSidebarOpen(true)}
+                  className="flex items-center gap-1.5 text-muted transition-colors hover:text-accent"
+                >
+                  <Inbox size={14} /> 渠道接入 · 工单收件箱
+                </button>
+                <button
+                  onClick={() => setPhase('compare')}
+                  className="flex items-center gap-1.5 text-accent hover:underline"
+                >
+                  看看我们比几千块的普通版强在哪 <ArrowRight size={14} />
+                </button>
               </div>
-              <div className="mt-4 text-left">
-                <InboxPanel
-                  onPickup={pickWorkOrder}
-                  autoAccept={autoAccept}
-                  onToggleAuto={() => setAutoAccept((v) => !v)}
-                />
-              </div>
-
-              <button
-                onClick={() => setPhase('compare')}
-                className="mx-auto mt-6 flex items-center gap-1.5 text-[13px] font-medium text-accent hover:underline"
-              >
-                看看我们比几千块的普通版强在哪 <ArrowRight size={14} />
-              </button>
             </motion.div>
           )}
 

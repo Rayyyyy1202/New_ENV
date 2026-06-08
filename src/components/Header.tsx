@@ -1,15 +1,17 @@
-import { Sparkles, RotateCcw, Swords } from 'lucide-react'
+import { Sparkles, RotateCcw, Swords, Inbox } from 'lucide-react'
 
 export default function Header({
   onReset,
   showReset,
   onCompare,
   showCompare,
+  onChannels,
 }: {
   onReset: () => void
   showReset: boolean
   onCompare: () => void
   showCompare: boolean
+  onChannels: () => void
 }) {
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-canvas/85 backdrop-blur">
@@ -24,6 +26,13 @@ export default function Header({
           </span>
         </div>
         <div className="flex items-center gap-1">
+          <button
+            onClick={onChannels}
+            className="flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[13px] text-muted transition-colors hover:bg-line/60 hover:text-ink"
+            title="渠道接入 · 工单收件箱"
+          >
+            <Inbox size={14} /> 渠道/工单
+          </button>
           {showCompare && (
             <button
               onClick={onCompare}

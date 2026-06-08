@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react'
 import { AnimatePresence, motion } from 'framer-motion'
-import { Sparkles, FileSpreadsheet, ArrowRight, Inbox } from 'lucide-react'
+import { Sparkles, FileSpreadsheet, Inbox } from 'lucide-react'
 import Header from './components/Header'
 import CommandBar from './components/CommandBar'
 import AgentFeed from './components/AgentFeed'
@@ -281,18 +281,12 @@ export default function App() {
                 <FileSpreadsheet size={15} /> 或直接加载示例装箱单(12 个商品)
               </button>
 
-              <div className="mt-6 flex flex-wrap items-center justify-center gap-x-5 gap-y-2 text-[13px] font-medium">
+              <div className="mt-6 flex justify-center text-[13px] font-medium">
                 <button
                   onClick={() => setSidebarOpen(true)}
                   className="flex items-center gap-1.5 text-muted transition-colors hover:text-accent"
                 >
                   <Inbox size={14} /> 渠道接入 · 工单收件箱
-                </button>
-                <button
-                  onClick={() => setPhase('compare')}
-                  className="flex items-center gap-1.5 text-accent hover:underline"
-                >
-                  看看我们比几千块的普通版强在哪 <ArrowRight size={14} />
                 </button>
               </div>
             </motion.div>

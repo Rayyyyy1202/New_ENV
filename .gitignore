@@ -8,3 +8,7 @@ dist-ssr
 npm-debug.log*
 *.tsbuildinfo
 .vercel
+
+# python
+__pycache__/
+*.pyc
